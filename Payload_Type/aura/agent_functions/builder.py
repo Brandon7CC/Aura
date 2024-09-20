@@ -213,7 +213,7 @@ class Aura(PayloadType):
             f"-isysroot {self.sdk_path} "
             f"-I {self.agent_code_path}/c2_profiles "
             f"{source_file_paths} "
-            f"-framework Foundation -framework UIKit -lobjc "
+            f"-framework Foundation -framework UIKit "
             f"-o {self.aura_payload_path} "
         )
 
@@ -232,11 +232,10 @@ class Aura(PayloadType):
         # Log the output from the command
         if stdout:
             print(f"STDOUT from {step_name}: {stdout.decode()}")
-        if stderr:
-            print(f"STDERR from {step_name}: {stderr.decode()}")
-
+            
         # If the command fails, capture and log the error
         if process.returncode != 0:
+            print(f"STDERR from {step_name}: {stderr.decode()}")
             error_message = f"Error during {step_name}:\n{stderr.decode()}"
             print(error_message)  # Print to console for additional logging
             await self._update_build_step(step_name, error_message, False)

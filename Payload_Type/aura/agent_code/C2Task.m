@@ -18,7 +18,7 @@
 }
 
 - (void)executeTask {
-    NSLog(@"[DEBUG] Executing task: %@", self.command);
+    NSLog(@"[DEBUG] 💥 Executing task: %@", self.command);
 
     // Dictionary mapping command strings to blocks (similar to a switch case)
     NSDictionary<NSString *, void (^)(void)> *taskCommandMap = @{
