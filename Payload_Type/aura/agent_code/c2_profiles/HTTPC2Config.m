@@ -42,7 +42,7 @@
 }
 
 + (NSString *)payloadUUID {
-    return @"7cd3681a-6cfc-4a1a-b743-039b82182e55";  // Inject the Mythic Payload UUID here
+    return @"af7047d2-5aff-4e5c-9be8-3bdbff4b5dc8";
 }
 
 + (BOOL)encryptedExchangeCheck {

