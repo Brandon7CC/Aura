@@ -60,3 +60,13 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+.DS_Store
+
+
+__pycache__/
+.DS_Store
+main
+.idea
+rabbitmq_config.json
+mythic_go_services.bin
+Payload_Type/aura/build/

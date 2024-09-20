@@ -1,0 +1,14 @@
+{
+    "os": ["iOS"],
+    "languages": ["Objective-C"] ,
+    "features": {
+      "mythic": ["browser scripts", "file chunking", "screenshots", "shell commands"],
+      "custom": []
+    },
+    "payload_output": ["macho"],
+    "architectures": ["arm_64"],
+    "c2": ["http"],
+    "mythic_version": "3.3.0",
+    "agent_version": "1.0.0",
+    "supported_wrappers": []
+  }
