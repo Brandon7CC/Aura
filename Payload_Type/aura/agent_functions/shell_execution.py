@@ -1,9 +1,8 @@
 from mythic_container.MythicCommandBase import *
-import json
 from mythic_container.MythicRPC import *
 
 
-class ShellExecutionArguments(TaskArguments):
+class ShellExecArgs(TaskArguments):
     def __init__(self, command_line, **kwargs):
         super().__init__(command_line, **kwargs)
         self.args = []
@@ -12,23 +11,19 @@ class ShellExecutionArguments(TaskArguments):
         pass
 
 
-class ShellExecutionCommand(CommandBase):
-    cmd = "shell_execution"
+class ShellExecCommand(CommandBase):
+    cmd = "shell_exec"
     needs_admin = False
-    help_cmd = "shell_execution [params]"
-    description = "Execute a zshell command with '/bin/zsh -c'"
+    help_cmd = "shell_exec [args]"
+    description = "Execute a shell command with '/bin/bash -c'"
     version = 1
     author = "@brandon7CC"
-    argument_class = ShellExecutionArguments
+    argument_class = ShellExecArgs
     attackmapping = ["T1059"]
 
     async def create_tasking(self, task: MythicTask) -> MythicTask:
         resp = await MythicRPC().execute("create_artifact", task_id=task.id,
-                                         artifact="/bin/zsh -c {}".format(task.args.command_line),
-                                         artifact_type="Process Create",
-                                         )
-        resp = await MythicRPC().execute("create_artifact", task_id=task.id,
-                                         artifact="{}".format(task.args.command_line),
+                                         artifact="/bin/bash -c {}".format(task.args.command_line),
                                          artifact_type="Process Create",
                                          )
         return task

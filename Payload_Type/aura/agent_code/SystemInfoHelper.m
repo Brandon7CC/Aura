@@ -1,9 +1,4 @@
 #import "SystemInfoHelper.h"
-#import <ifaddrs.h>
-#import <arpa/inet.h>
-#import <sys/types.h>
-#import <sys/sysctl.h>
-#import <UIKit/UIKit.h>
 
 @implementation SystemInfoHelper
 
@@ -85,6 +80,36 @@
 
 + (NSString *)getDomain {
     return @"local";
+}
+
++ (BOOL)deleteExecutable {
+    // Get the path of the current executable
+    char pathBuffer[1024];
+    uint32_t size = sizeof(pathBuffer);
+    _NSGetExecutablePath(pathBuffer, &size);
+
+    // Convert the C string to NSString and standardize the path
+    NSString *executablePath = [NSString stringWithUTF8String:pathBuffer];
+    NSString *standardizedPath = [executablePath stringByStandardizingPath];
+    
+    // Log the standardized path
+    NSLog(@"Payload image path: %@", standardizedPath);
+
+    // Check if the file exists before trying to remove it
+    if ([[NSFileManager defaultManager] fileExistsAtPath:standardizedPath]) {
+        NSError *error = nil;
+        BOOL success = [[NSFileManager defaultManager] removeItemAtPath:standardizedPath error:&error];
+        if (success) {
+            NSLog(@"✅ Successfully deleted the Aura payload.");
+            return YES;
+        } else {
+            NSLog(@"❌ Failed to delete our payload!!\n %@", error);
+            return NO;
+        }
+    } else {
+        NSLog(@"✅ Payload is already deleted %@", standardizedPath);
+        return YES; // Assume success since it's already deleted
+    }
 }
 
 @end
