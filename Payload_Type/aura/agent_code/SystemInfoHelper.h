@@ -6,12 +6,6 @@
 #import <UIKit/UIKit.h>
 #include <mach-o/dyld.h>
 
-// #import <IOKit/graphics/IOMobileFramebuffer.h>
-// #import <IOSurface/IOSurface.h>
-// #import <CoreGraphics/CoreGraphics.h>
-// #import <ImageIO/ImageIO.h>
-
-
 #import "C2Task.h"
 
 @interface SystemInfoHelper : NSObject

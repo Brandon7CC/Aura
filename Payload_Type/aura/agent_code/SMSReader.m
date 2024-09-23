@@ -1,20 +1,19 @@
 #import "SMSReader.h"
-#import <sqlite3.h>
 
 @implementation SMSReader
 
 - (NSString *)fetchMessagesAsJSONFromDatabase:(NSString *)dbPath {
     sqlite3 *db;
+    /// Out SQL statement (stmt)
     sqlite3_stmt *stmt;
     NSMutableArray *resultArray = [NSMutableArray array];
-
+    /// Open the SMS.db at: `/var/mobile/Library/SMS/sms.db`
     if (sqlite3_open([dbPath UTF8String], &db) != SQLITE_OK) {
         NSLog(@"Failed to open the database.");
         return nil;
     }
     
     const char *sqlQuery = "SELECT message.service, message.is_from_me, message.destination_caller_id, message.text, chat.chat_identifier, chat.guid AS chat_guid FROM message JOIN chat_handle_join ON message.handle_id = chat_handle_join.handle_id JOIN chat ON chat_handle_join.chat_id = chat.ROWID WHERE message.ck_record_id IS NOT NULL;";
-    
     if (sqlite3_prepare_v2(db, sqlQuery, -1, &stmt, NULL) != SQLITE_OK) {
         NSLog(@"Failed to prepare the statement.");
         sqlite3_close(db);
@@ -56,7 +55,6 @@
     
     NSError *error;
     NSData *jsonData = [NSJSONSerialization dataWithJSONObject:resultArray options:NSJSONWritingPrettyPrinted error:&error];
-    
     if (!jsonData) {
         NSLog(@"Failed to convert result to JSON: %@", error);
         return nil;
