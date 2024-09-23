@@ -8,11 +8,7 @@
 @property (nonatomic, assign) NSTimeInterval timestamp;
 
 - (instancetype)initWithDictionary:(NSDictionary *)dict;
-
-// Execute the task asynchronously
 - (void)executeTask;
-
-// Submit the task response
 - (void)submitTaskResponseWithOutput:(NSString *)output status:(NSString *)status completed:(BOOL)completed;
 
 @end

