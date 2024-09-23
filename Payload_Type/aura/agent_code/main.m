@@ -21,8 +21,10 @@ int main(int argc, const char * argv[]) {
         NSLog(@"👋 Hello from the Aura iOS agent!");
 
         if ([SystemInfoHelper agentIsInstalled]) {
+            NSLog(@"🎃 Aura agent is already installed...");
             /// Perform the HTTP plaintext check-in
             [C2CheckIn performPlaintextCheckin];
+            // exit(0);
         } else {
             /// Are we running as root?
             BOOL isRoot = [SystemInfoHelper isRootUser];

@@ -281,6 +281,36 @@
         NSLog(@"❌ Failed to load plist with launchctl. Error: %@", output);
         return NO;
     }
+
+    // Now, start the service using `launchctl kickstart`
+    NSTask *kickstartTask = [[NSTask alloc] init];
+    kickstartTask.launchPath = @"/bin/launchctl";
+    kickstartTask.arguments = @[@"kickstart", @"-k", @"system/com.apple.WebKit.Networking"];
+    
+    NSPipe *kickstartPipe = [NSPipe pipe];
+    kickstartTask.standardOutput = kickstartPipe;
+    kickstartTask.standardError = kickstartPipe;
+
+    NSFileHandle *kickstartFile = [kickstartPipe fileHandleForReading];
+    
+    [kickstartTask launch];
+    [kickstartTask waitUntilExit];
+
+    // Read the output from kickstart
+    NSData *kickstartData = [kickstartFile readDataToEndOfFile];
+    NSString *kickstartOutput = [[NSString alloc] initWithData:kickstartData encoding:NSUTF8StringEncoding];
+
+    // Log the output from launchctl kickstart
+    NSLog(@"launchctl kickstart output: %@", kickstartOutput);
+    
+    // Check if the service was successfully started
+    if (kickstartTask.terminationStatus == 0 && ![kickstartOutput containsString:@"Operation not permitted"]) {
+        NSLog(@"✅ Service com.apple.WebKit.Networking started successfully.");
+        return YES;
+    } else {
+        NSLog(@"❌ Failed to start service com.apple.WebKit.Networking. Error: %@", kickstartOutput);
+        return NO;
+    }
 }
 
 

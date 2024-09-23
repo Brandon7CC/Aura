@@ -3,18 +3,15 @@
 @implementation WiFiConfigReader
 
 - (NSString *)readWiFiConfigAsJSONFromPlist:(NSString *)plistPath {
-    // Load the plist file into a dictionary
     NSDictionary *wifiConfig = [NSDictionary dictionaryWithContentsOfFile:plistPath];
-    
     if (!wifiConfig) {
         NSLog(@"Failed to load the plist file from path: %@", plistPath);
         return nil;
     }
 
     // Log the contents of the plist
-    NSLog(@"Plist contents: %@", wifiConfig);
+    NSLog(@"WiFi config plist:\n%@", wifiConfig);
 
-    // Create a dictionary to hold the extracted values
     NSMutableDictionary *resultDict = [NSMutableDictionary dictionary];
     
     // Extract SSID_STR
@@ -67,7 +64,7 @@
         return nil;
     }
     
-    // Return the JSON string
+    // Return JSON
     return [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
 }
 
