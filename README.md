@@ -31,8 +31,10 @@ Aura is an iOS payload designed to interact with a Mythic C2 (command and contro
 ## Operator commands
 | Description | Implemented Command |
 | - | - |
-| Take a screenshot | `take_screenshot` |
-| Execute a shell command | `shell_execution [args]` |
+| Execute a shell command | `shell_exec [args]` |
+| List a file | `ls [args]` |
+| Read and correlate SMS messages | `messages` |
+| Exit and uninstall the Agent | `exit` |
 
 ## Execution example
 ```txt
