@@ -1,0 +1,6 @@
+{
+  "rabbitmq_host": "MYTHIC_IP",
+  "rabbitmq_password": "RABBITMQ_PASSWORD",
+  "mythic_server_host": "MYTHIC_IP",
+  "debug_level": "debug"
+}
