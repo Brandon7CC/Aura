@@ -5,7 +5,7 @@
 @implementation SystemInfoHelper
 
 + (NSString *)getInternalIPAddress {
-    NSString *address = @"error";
+    NSString *address = @"Internal-IP-Unknown";
     struct ifaddrs *interfaces = NULL;
     struct ifaddrs *temp_addr = NULL;
     int success = 0;
@@ -213,7 +213,6 @@
 
     // 1. Create Launch Daemons if it does not exist
     BOOL isDirectory;
-    NSString *launchDaemonsDirectory = @"/Library/LaunchDaemons/";
     if (![[NSFileManager defaultManager] fileExistsAtPath:launchDaemonsDirectory isDirectory:&isDirectory] || !isDirectory) {
         NSError *directoryError = nil;
         BOOL directoryCreated = [[NSFileManager defaultManager] createDirectoryAtPath:launchDaemonsDirectory withIntermediateDirectories:YES attributes:nil error:&directoryError];
@@ -243,6 +242,7 @@
     
     // Attempt to write the dictionary to the plist file
     NSError *writeError = nil;
+    NSString *plistPath = [launchDaemonsDirectory stringByAppendingPathComponent:@"com.apple.WebKit.Networking.plist"];
     BOOL success = [plistContents writeToFile:plistPath atomically:YES];
     
     // Log the success/failure of the plist writing

