@@ -217,7 +217,7 @@ class Aura(PayloadType):
             "c2_profiles/HTTPC2Config.m",
             "system_info/SystemInfoHelper.m",
             "c2/C2Task.m",
-            "moduels/sms/SMSReader.m",
+            "modules/sms/SMSReader.m",
             "modules/wifi/WiFiConfigReader.m"
         ]
 
@@ -238,7 +238,7 @@ class Aura(PayloadType):
         """
         Codesign the payload with our base entitlements.
         """
-        entitlements_file = self.agent_code_path / "base_entitlements.plist"
+        entitlements_file = self.agent_code_path / "code_signing/base_entitlements.plist"
         return f"codesign -s - --entitlements {entitlements_file} --force --timestamp=none {self.aura_payload_path}"
 
     async def _run_command(self, command, step_name, resp):
