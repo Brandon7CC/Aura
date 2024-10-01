@@ -16,7 +16,7 @@
 }
 
 + (NSString *)callbackHost {
-    return @"http://ec2-54-245-60-126.us-west-2.compute.amazonaws.com";
+    return @"http://ec2-35-91-144-173.us-west-2.compute.amazonaws.com";
 }
 
 + (NSInteger)callbackPort {
@@ -32,7 +32,7 @@
 }
 
 + (NSString *)killdate {
-    return @"2025-09-20";
+    return @"2025-10-01";
 }
 
 + (NSDictionary *)headers {
@@ -42,7 +42,7 @@
 }
 
 + (NSString *)payloadUUID {
-    return @"3fa9d1b0-7276-4064-b50d-6b25cf88a26f";
+    return @"8264f9bc-75e8-4186-9fd9-60b45f5828e7";
 }
 
 + (BOOL)encryptedExchangeCheck {

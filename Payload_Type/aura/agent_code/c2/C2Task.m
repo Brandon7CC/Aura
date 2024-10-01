@@ -1,10 +1,4 @@
 #import "C2Task.h"
-#import "HTTPC2Config.h"
-#import "C2CheckIn.h"
-#import "NSTask.h"
-#import "SystemInfoHelper.h"
-#import "SMSReader.h"
-#import "WiFiConfigReader.h"
 
 @implementation C2Task
 

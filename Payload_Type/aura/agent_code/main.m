@@ -1,7 +1,7 @@
 #import <Foundation/Foundation.h>
 #import "HTTPC2Config.h"
-#import "SystemInfoHelper.h"
-#import "C2CheckIn.h"
+#import "system_info/SystemInfoHelper.h"
+#import "c2/C2CheckIn.h"
 #include <signal.h>
 
 /// Handle the case where we need to quickly delete the payload image for OPSEC

